@@ -43,6 +43,8 @@ export interface Product {
   badge?: 'new' | 'hot' | 'lowstock' | 'sale' | 'limited' | 'popular';
   description?: string;
   oldPrice?: number;
+  specifications?: { key: string; value: string }[];
+  seoKeywords?: string;
 }
 
 export interface WorkHistory {

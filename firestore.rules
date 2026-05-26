@@ -2,66 +2,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function getEmail() {
+      return request.auth.token.email;
+    }
+
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email.toLowerCase() == "itdepartmentpro33@gmail.com" ||
-        request.auth.token.email.toLowerCase() == "djbmremix87@gmail.com"
+        getEmail().toLowerCase() == "itdepartmentpro33@gmail.com" ||
+        getEmail().toLowerCase() == "djbmremix87@gmail.com" ||
+        getEmail().toLowerCase() == "itdepartmentpro33@app.internal" ||
+        getEmail().toLowerCase() == "djbmremix87@app.internal"
       );
     }
 
-    // Individual User Data (for migration/backup)
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // --- Collections ---
+
+    // Individual User Data
     match /users/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Products: Anyone can read, only admin can manage
+    // Products
     match /products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
+      // Allow decreasing stock during order placement for non-admins
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']);
     }
 
-    // Offers: Anyone can read, only admin can create/delete, anyone signed in can like/comment
+    // Offers
     match /offers/{offerId} {
       allow read: if true;
       allow create, delete: if isAdmin();
       allow update: if isSignedIn();
     }
 
-    // Alerts: Anyone can read, only admin can write
+    // Alerts
     match /alerts/{alertId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Services: Anyone can read, only admin can write
+    // Services
     match /services/{serviceId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Staff: Admin can manage, authenticated users can read basic info
+    // Staff
     match /staff/{staffId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
-      
-      // Location updates: Staff can update their own location if their email matches
-      allow update: if isSignedIn() && (isAdmin() || request.auth.token.email == resource.data.email);
+      allow update: if isSignedIn() && (isAdmin() || getEmail().toLowerCase() == resource.data.get('email', '').toLowerCase());
 
       match /history/{historyId} {
         allow read: if isAdmin();
-        allow create: if isSignedIn() && (isAdmin() || request.auth.token.email == get(/databases/$(database)/documents/staff/$(staffId)).data.email);
+        allow create: if isSignedIn() && (isAdmin() || getEmail().toLowerCase() == get(/databases/$(database)/documents/staff/$(staffId)).data.get('email', '').toLowerCase());
       }
     }
 
-    // Public Orders: Anyone can create, admin can manage
+    // Public Orders
     match /public_orders/{orderId} {
       allow read: if true;
-      allow create: if true;
-      allow update, delete: if isAdmin() || (resource.data.status == "pending");
+      allow create, update: if true;
+      allow delete: if isAdmin();
     }
 
     // Settings
@@ -70,12 +89,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Clients & Expenses: Admin only (or anyone for testing if needed, but keeping it admin for now)
+    // Clients
     match /clients/{clientId} {
-      allow read, write: if isAdmin() || isSignedIn(); 
+      allow read, list: if isAdmin() || (isSignedIn() && resource.data.get('email', '') == getEmail());
+      allow write: if isAdmin();
     }
+
+    // Expenses
     match /expenses/{expenseId} {
-      allow read, write: if isAdmin();
+      allow read, list: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // Health check

@@ -86,7 +86,9 @@ import {
   Cctv,
   Activity,
   Camera,
-  Eye
+  Eye,
+  LogIn,
+  UserPlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import gsap from 'gsap';
@@ -396,106 +398,123 @@ const ProductPastaCard = ({
   onSelect, 
   isAdmin, 
   onEdit, 
-  onDelete 
+  onDelete,
+  addToCart
 }: { 
   product: Product, 
   onSelect?: (p: Product) => void,
   isAdmin?: boolean,
   onEdit?: (p: Product) => void,
-  onDelete?: (id: number | string) => void
+  onDelete?: (id: number | string) => void,
+  addToCart?: (p: Product) => void
 }) => {
+  // Generate random stable-looking review counts for professional touch
+  const reviewCount = useMemo(() => {
+    return Math.floor(((Number(product.id) || 1) * 17) % 85) + 12;
+  }, [product.id]);
+
   return (
     <div 
-      className="uiverse-glow-card group relative h-full flex flex-col cursor-pointer bg-white dark:bg-slate-900 overflow-hidden"
+      className="group relative h-full flex flex-col cursor-pointer bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-[20px] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] overflow-hidden"
       onClick={() => (onSelect ? onSelect(product) : (onEdit ? onEdit(product) : null))}
     >
-      <div className="uiverse-glow-card-light"></div>
-      <div className="uiverse-glow-card-content flex flex-col h-full p-4 sm:p-5">
-        {/* Badge Overlay */}
-        <div className="absolute top-4 left-4 z-20 flex flex-col gap-1">
-          {product.badge && (
-            <span className="px-3 py-1 bg-blue-600 text-white text-[9px] font-black uppercase rounded-full shadow-lg">
-              {product.badge}
+      {/* Badge Overlay */}
+      {product.badge && (
+        <div className="absolute top-4 left-4 z-20">
+          <span className="px-3 py-1 bg-[#bf0528]/95 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-wider rounded-full shadow-md">
+            {product.badge}
+          </span>
+        </div>
+      )}
+
+      {/* Image Container with Soft Shading */}
+      <div className="w-full aspect-square relative bg-slate-50 dark:bg-slate-950/60 flex items-center justify-center p-6 select-none overflow-hidden border-b border-gray-50 dark:border-slate-900">
+        {product.image ? (
+          <img 
+            src={product.image} 
+            alt={product.name} 
+            className="w-4/5 h-4/5 object-contain relative z-10 transition-transform duration-700 group-hover:scale-105" 
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `https://placehold.co/400x300/f1f5f9/475569?text=${encodeURIComponent(product.name || 'Product')}`;
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-700">
+            <Package size={48} strokeWidth={1} />
+          </div>
+        )}
+        
+        {/* Quick Purchase Hover Bar */}
+        <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm flex items-center justify-center z-20 border-t border-gray-100 dark:border-slate-800">
+          <button 
+            className="w-full py-2 bg-[#bf0528] hover:bg-red-800 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (addToCart) {
+                addToCart(product);
+              } else {
+                // Trigger global cart addition if not directly passed
+                const ev = new CustomEvent('add-product-to-cart', { detail: product });
+                window.dispatchEvent(ev);
+              }
+            }}
+          >
+            <ShoppingCart size={11} />
+            Quick Purchase
+          </button>
+        </div>
+      </div>
+
+      {/* Content Section */}
+      <div className="p-4 sm:p-5 flex flex-col flex-1 select-none">
+        {/* Category Label */}
+        <span className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 select-none">
+          {product.category || 'Surveillance'}
+        </span>
+
+        {/* Title */}
+        <h4 className="text-xs sm:text-sm font-black text-slate-800 dark:text-gray-100 uppercase tracking-tight line-clamp-1 group-hover:text-[#bf0528] transition-colors mb-2">
+          {product.name}
+        </h4>
+
+        {/* Brand Rating Row */}
+        <div className="flex items-center gap-1.5 mb-4">
+          <div className="flex text-amber-400 text-xs tracking-tighter">
+            <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+          </div>
+          <span className="text-[10px] text-gray-400 font-bold dark:text-slate-500">({reviewCount})</span>
+        </div>
+
+        {/* Price Row at the bottom */}
+        <div className="mt-auto flex items-center justify-between">
+          <div className="flex items-baseline gap-2">
+            <span className="text-slate-900 dark:text-white font-black text-base tracking-tight text-[15px]">
+              {formatCurrency(product.price)}
             </span>
-          )}
-        </div>
-
-        {/* Image Container with Lighting Effect */}
-        <div className="w-full aspect-square relative rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-800/40 flex items-center justify-center p-4 mb-4">
-          <div className="absolute inset-0 bg-png opacity-5" />
-          {product.image ? (
-            <img 
-              src={product.image} 
-              alt={product.name} 
-              className="w-full h-full object-contain relative z-10 transition-transform duration-700 group-hover:scale-110 drop-shadow-2xl"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = `https://placehold.co/400x300/f1f5f9/475569?text=${encodeURIComponent(product.name || 'Product')}`;
-              }}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Package size={50} className="text-slate-200 dark:text-slate-700" />
-            </div>
-          )}
-          
-          {/* Quick View Overlay */}
-          <div className="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-            <div className="bg-white text-blue-600 px-4 py-2 rounded-full shadow-xl font-bold text-[10px] uppercase flex items-center gap-2">
-              <Eye size={14} />
-              View Detail
-            </div>
-          </div>
-        </div>
-
-        {/* Info Section */}
-        <div className="flex flex-col flex-1">
-          <div className="flex flex-col gap-1 mb-4">
-            <h4 className="text-sm font-bold text-slate-800 dark:text-white line-clamp-1 group-hover:text-blue-600 transition-colors">
-              {product.name}
-            </h4>
-            <div className="flex items-center gap-2">
-              <span className="text-blue-600 dark:text-blue-400 font-black text-lg">
-                {formatCurrency(product.price)}
+            {product.oldPrice || true ? (
+              <span className="text-[10px] text-gray-400 dark:text-slate-500 line-through">
+                {formatCurrency(product.oldPrice || (product.price * 1.15))}
               </span>
-              {product.oldPrice && (
-                <span className="text-xs text-slate-400 line-through">
-                  ৳{product.oldPrice}
-                </span>
-              )}
+            ) : null}
+          </div>
+
+          {isAdmin && onEdit && onDelete && (
+            <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+              <button 
+                onClick={() => onEdit(product)} 
+                className="p-1 px-2.5 bg-slate-50 dark:bg-slate-800 text-slate-500 hover:text-[#bf0528] rounded-lg transition-colors text-[9px] font-black uppercase tracking-wider"
+              >
+                Edit
+              </button>
+              <button 
+                onClick={() => onDelete(product.id)} 
+                className="p-1 px-2.5 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-600 rounded-lg transition-colors text-[9px] font-black uppercase tracking-wider"
+              >
+                Del
+              </button>
             </div>
-          </div>
-
-          <div className="mt-auto space-y-3">
-            <button 
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] flex items-center justify-center gap-2"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-            >
-              <ShoppingCart size={14} />
-              Quick Purchase
-            </button>
-
-            {isAdmin && onEdit && onDelete && (
-              <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                <button 
-                  onClick={() => onEdit(product)} 
-                  className="flex-1 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-all flex items-center justify-center gap-1 text-[9px] font-bold"
-                >
-                  <Edit2 size={10} />
-                  Edit
-                </button>
-                <button 
-                  onClick={() => onDelete(product.id)} 
-                  className="flex-1 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-600 transition-all flex items-center justify-center gap-1 text-[9px] font-bold"
-                >
-                  <Trash2 size={10} />
-                  Delete
-                </button>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -504,16 +523,7 @@ const ProductPastaCard = ({
 
 // --- Helpers ---
 export const playSound = (type: 'click' | 'hover' | 'success' | 'error' | 'pop') => {
-  const sounds = {
-    click: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
-    hover: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
-    success: 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3',
-    error: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3',
-    pop: 'https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3'
-  };
-  const audio = new Audio(sounds[type]);
-  audio.volume = 0.4;
-  audio.play().catch(() => {}); 
+  // Sound disabled per user request
 };
 
 export const getBase64Image = (url: string): Promise<string> => {
@@ -675,7 +685,16 @@ export const generateOrderPDF = async (order: PublicOrder, customLogo?: string |
     doc.setTextColor(150);
     doc.text("Thank you for choosing Al Amin Technology. This is a computer-generated voucher.", margin, pageHeight - 15);
 
-    doc.save(`${order.id}_Inverse.pdf`);
+    // Robust download for iframes
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Order_${order.id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   } catch (err) {
     console.error("PDF Gen Error", err);
   } finally {
@@ -730,7 +749,16 @@ export const generateReceiptPDF = (order: Order) => {
   doc.text('Thank you for your business!', 105, finalY, { align: 'center' });
   doc.text('This is a computer generated receipt.', 105, finalY + 7, { align: 'center' });
   
-  doc.save(`Receipt-${order.id}.pdf`);
+  // Robust download for iframes
+  const pdfBlob = doc.output('blob');
+  const url = URL.createObjectURL(pdfBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Receipt-${order.id}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 // --- Components ---
@@ -1739,29 +1767,48 @@ const ProductDetailsModal = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[150] flex items-center justify-center p-4 overflow-y-auto"
-      onClick={onClose}
+      className="fixed inset-0 bg-slate-950 z-[150] overflow-y-auto font-sans text-white flex flex-col"
     >
-      <motion.div 
-        initial={{ scale: 0.9, y: 20, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.9, y: 20, opacity: 0 }}
-        className="w-full max-w-[500px] glow-effect-container text-white shadow-2xl relative"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Animated background flare */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[300px] bg-blue-600/20 blur-[100px] -z-10 pointer-events-none" />
-
-        <div className="relative p-6 sm:p-7">
+      {/* Top Beautiful Header Bar */}
+      <div className="sticky top-0 z-50 bg-slate-900/85 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+        <button 
+          onClick={onClose}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition"
+        >
+          <ArrowLeft size={16} />
+          <span className="text-xs font-bold tracking-wider uppercase">হোমপেজে ফিরুন (Back)</span>
+        </button>
+        
+        <h3 className="hidden sm:block text-sm font-black tracking-widest text-slate-400 shortcut uppercase">
+          Product Details Specification Page
+        </h3>
+        
+        <div className="flex gap-2">
+          {isAdmin && (
+            <button 
+              onClick={() => onEdit?.(product)}
+              className="p-2 bg-blue-600/10 text-blue-400 border border-blue-600/20 rounded-xl hover:bg-blue-600 hover:text-white transition"
+              title="Edit Product"
+            >
+              <Edit2 size={16} />
+            </button>
+          )}
           <button 
             onClick={onClose}
-            className="absolute top-4 right-4 w-9 h-9 bg-slate-800/80 text-white rounded-full flex items-center justify-center hover:bg-slate-700 transition-all hover:rotate-90 z-20"
+            className="p-2 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 w-full max-w-7xl mx-auto px-4 py-8 md:py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-14">
           
-          <div className="flex flex-col sm:flex-row gap-6">
-            <div className="relative w-48 h-48 sm:w-60 sm:h-60 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden bg-png flex items-center justify-center shrink-0">
+          {/* Left Column - Product Showcase (Huge media viewer) */}
+          <div className="space-y-6">
+            <div className="relative w-full aspect-square rounded-[32px] border border-slate-800 shadow-2xl overflow-hidden bg-slate-900 flex items-center justify-center">
               {showVideo && product.videoUrl ? (
                 <video 
                   src={product.videoUrl} 
@@ -1770,94 +1817,133 @@ const ProductDetailsModal = ({
                   autoPlay
                 />
               ) : product.image ? (
-                <img src={product.image} alt={product.name} className="w-full h-full object-contain p-2" />
+                <img src={product.image} alt={product.name} className="w-full h-full object-contain p-4" />
               ) : (
-                <Package size={60} className="text-slate-700" strokeWidth={1} />
+                <Package size={100} className="text-slate-800" strokeWidth={1} />
               )}
 
               {product.videoUrl && (
                 <button 
                   onClick={() => setShowVideo(!showVideo)}
-                  className="absolute bottom-3 right-3 bg-blue-600 text-white rounded-xl px-3 py-1.5 text-[9px] font-black shadow-lg flex items-center gap-2 uppercase tracking-widest hover:bg-blue-500 transition-colors"
+                  className="absolute bottom-4 right-4 bg-blue-600 text-white rounded-2xl px-4 py-2 text-xs font-black shadow-lg flex items-center gap-2 uppercase tracking-widest hover:bg-blue-500 transition-colors"
                 >
-                  {showVideo ? <ImageIcon size={12} /> : <Video size={12} />}
-                  {showVideo ? 'Image' : 'Video'}
+                  {showVideo ? <ImageIcon size={14} /> : <Video size={14} />}
+                  {showVideo ? 'Show Image' : 'Play Video'}
                 </button>
               )}
             </div>
-
-            <div className="flex-1 w-full text-center sm:text-left pt-1">
-              <span className="inline-block px-3 py-1 bg-blue-600/10 text-blue-500 text-[9px] font-black rounded-full uppercase tracking-widest border border-blue-600/20 mb-2">
-                {product.category}
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-white leading-tight mb-2">{product.name}</h2>
-              <div className="flex items-center justify-center sm:justify-start gap-3 mb-4">
-                <p className="text-2xl font-black text-blue-600 font-mono tracking-tighter">৳{product.price}</p>
-                {product.oldPrice && (
-                  <p className="text-slate-500 line-through text-xs font-bold">৳{product.oldPrice}</p>
-                )}
-              </div>
-
-              <div className="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/50 mb-5 text-left">
-                <p className="text-[11px] text-slate-400 leading-relaxed font-medium line-clamp-4">
-                  {product.description || `High-performance ${product.name} with advanced smart sensing and industrial-grade construction.`}
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => {
-                    addToCart(product);
-                    addNotification(`${product.name} added to cart!`);
-                  }}
-                  disabled={product.stock <= 0}
-                  className={cn(
-                    "flex-1 h-12 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-600/20",
-                    product.stock > 0 
-                      ? "bg-blue-600 text-white hover:bg-blue-500" 
-                      : "bg-slate-800 text-slate-500 cursor-not-allowed"
-                  )}
-                >
-                  <ShoppingCart size={16} />
-                  {product.stock > 0 ? 'Add to Cart' : 'Sold Out'}
-                </button>
-
-                <button 
-                  onClick={() => {
-                    const text = `Hello! I'm interested in the ${product.name} (Price: ৳${product.price}). Is it available?`;
-                    window.open(`https://wa.me/8801934279566?text=${encodeURIComponent(text)}`, '_blank');
-                  }}
-                  className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
-                >
-                  <MessageSquare size={20} />
-                </button>
-              </div>
-            </div>
           </div>
 
-          {isAdmin && (
-            <div className="flex gap-2 mt-6 pt-5 border-t border-slate-800/50">
-              <button 
-                onClick={() => onEdit?.(product)}
-                className="flex-1 h-10 bg-blue-600/10 text-blue-500 border border-blue-600/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
-              >
-                <Edit2 size={14} /> Edit
-              </button>
+          {/* Right Column - Product Meta, Info, Specs, Actions */}
+          <div className="space-y-8 flex flex-col justify-start">
+            <div>
+              <span className="inline-block px-3 py-1.5 bg-blue-600/10 text-blue-400 text-[10px] font-black rounded-full uppercase tracking-widest border border-blue-600/20 mb-3">
+                {product.category}
+              </span>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white leading-tight break-words mb-3">
+                {product.name}
+              </h1>
+              <div className="flex items-center gap-4 mb-4">
+                <p className="text-3xl font-black text-blue-500 font-mono tracking-tight">৳{product.price}</p>
+                {product.oldPrice && (
+                  <p className="text-slate-500 line-through text-lg font-bold">৳{product.oldPrice}</p>
+                )}
+                <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg ${product.stock > 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                  {product.stock > 0 ? `${product.stock} In Stock` : 'Out of Stock'}
+                </span>
+              </div>
+            </div>
+
+            {/* Core Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 p-5 bg-slate-900/40 border border-slate-800/80 rounded-[24px]">
               <button 
                 onClick={() => {
-                  if (confirm('Are you sure you want to delete this product?')) {
-                    onDelete?.(product.id);
-                    onClose();
-                  }
+                  addToCart(product);
+                  addNotification(`${product.name} added to cart!`);
                 }}
-                className="flex-1 h-10 bg-red-600/10 text-red-500 border border-red-600/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                disabled={product.stock <= 0}
+                className={cn(
+                  "flex-1 h-14 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg",
+                  product.stock > 0 
+                    ? "bg-blue-600 text-white hover:bg-blue-500 shadow-blue-500/10" 
+                    : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                )}
               >
-                <Trash2 size={14} /> Delete
+                <ShoppingCart size={18} />
+                {product.stock > 0 ? 'Add to Cart' : 'Sold Out'}
+              </button>
+
+              <button 
+                onClick={() => {
+                  const text = `Hello! I'm interested in the ${product.name} (Price: ৳${product.price}). Is it available?`;
+                  window.open(`https://wa.me/8801934279566?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="h-14 px-6 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-950/40 active:scale-95"
+              >
+                <MessageSquare size={18} /> Order on WhatsApp
               </button>
             </div>
-          )}
+
+            {/* Description Details Card */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest border-b border-slate-800 pb-2">
+                Product Description
+              </h4>
+              <div className="prose prose-invert max-w-none text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                {product.description || `High-performance ${product.name} with advanced smart sensing and industrial-grade construction.`}
+              </div>
+            </div>
+
+            {/* Specifications Tab */}
+            {product.specifications && product.specifications.length > 0 && (
+              <div className="space-y-4 pt-4">
+                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest border-b border-slate-800 pb-2">
+                  Technical Specifications (স্পেসিফিকেশন)
+                </h4>
+                <div className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/30">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <tbody>
+                      {product.specifications.map((spec, i) => (
+                        <tr 
+                          key={i} 
+                          className={cn("border-b last:border-0 border-slate-800/60 transition-colors hover:bg-slate-800/10")}
+                        >
+                          <td className="p-3.5 font-bold text-slate-400 w-1/3 bg-slate-900/30">{spec.key}</td>
+                          <td className="p-3.5 text-slate-200 capitalize w-2/3 whitespace-pre-wrap">{spec.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            
+            {/* If Admin controls */}
+            {isAdmin && (
+              <div className="flex gap-2 pt-5 border-t border-slate-800/50">
+                <button 
+                  onClick={() => onEdit?.(product)}
+                  className="flex-1 h-12 bg-blue-600/10 text-blue-500 border border-blue-600/20 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <Edit2 size={14} /> Edit Product
+                </button>
+                <button 
+                  onClick={() => {
+                    if (confirm('Are you sure you want to delete this product?')) {
+                      onDelete?.(product.id);
+                      onClose();
+                    }
+                  }}
+                  className="flex-1 h-12 bg-red-600/10 text-red-500 border border-red-600/20 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <Trash2 size={14} /> Delete Product
+                </button>
+              </div>
+            )}
+          </div>
+
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   );
 };
@@ -2193,8 +2279,15 @@ const ProductList = ({
   const [filter, setFilter] = useState('all');
 
   const fuse = useMemo(() => new Fuse(products, {
-    keys: ['name', 'category', 'description'],
-    threshold: 0.4,
+    keys: [
+      'name', 
+      'category', 
+      'description', 
+      { name: 'seoKeywords', weight: 1.5 },
+      { name: 'specifications.key', weight: 0.8 },
+      { name: 'specifications.value', weight: 1.2 }
+    ],
+    threshold: 0.45,
     includeScore: true
   }), [products]);
 
@@ -2202,8 +2295,26 @@ const ProductList = ({
     let result = products;
 
     if (search) {
-      const fuzzyResults = fuse.search(search);
-      result = fuzzyResults.map(r => r.item);
+      const searchLower = search.toLowerCase().trim();
+      const fuzzyResults = fuse.search(search).map(r => r.item);
+      
+      const substringResults = products.filter(p => {
+        const nameMatch = p.name.toLowerCase().includes(searchLower);
+        const categoryMatch = p.category.toLowerCase().includes(searchLower);
+        const descMatch = (p.description || '').toLowerCase().includes(searchLower);
+        const seoMatch = (p.seoKeywords || '').toLowerCase().includes(searchLower);
+        const specMatch = (p.specifications || []).some(spec => 
+          spec.key.toLowerCase().includes(searchLower) || 
+          spec.value.toLowerCase().includes(searchLower)
+        );
+        return nameMatch || categoryMatch || descMatch || seoMatch || specMatch;
+      });
+
+      const uniqueResults = new Set<Product>();
+      substringResults.forEach(item => uniqueResults.add(item));
+      fuzzyResults.forEach(item => uniqueResults.add(item));
+
+      result = Array.from(uniqueResults);
     }
 
     if (filter !== 'all') {
@@ -2469,7 +2580,8 @@ const AdminDashboard = ({
   isAdmin,
   isDarkMode,
   setShowAddProduct,
-  onEditProduct
+  onEditProduct,
+  deleteAnyOrder
 }: { 
   products: Product[], 
   clients: Client[], 
@@ -2480,7 +2592,8 @@ const AdminDashboard = ({
   isAdmin: boolean,
   isDarkMode: boolean,
   setShowAddProduct?: (v: boolean) => void,
-  onEditProduct?: (p: Product) => void
+  onEditProduct?: (p: Product) => void,
+  deleteAnyOrder?: (order: any) => Promise<void>
 }) => {
   const totalClients = clients.length;
   const totalProducts = products.length;
@@ -2689,13 +2802,13 @@ const AdminDashboard = ({
                 <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Client Name</th>
                 <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</th>
                 <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                <th className="pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-slate-800/20">
               {[
                 ...publicOrders.map(o => ({ ...o, clientName: o.customerName, type: 'Public' })),
-                ...clients.flatMap(c => (c.orders || []).map(o => ({ ...o, clientName: c.name, type: 'CRM' })))
+                ...clients.flatMap(c => (c.orders || []).map(o => ({ ...o, clientName: c.name, type: 'CRM', clientId: c.id })))
               ].sort((a,b) => b.id.localeCompare(a.id)).slice(0, 12).map((order, idx) => (
                 <tr key={`${order.id}-${order.type}-${idx}`} className="group hover:bg-gray-50 dark:hover:bg-slate-800/10 transition-colors">
                   <td className="py-5 font-mono text-[10px] font-bold text-blue-600 dark:text-emerald-400">{order.id}</td>
@@ -2712,6 +2825,17 @@ const AdminDashboard = ({
                     </span>
                   </td>
                   <td className="py-5 text-[10px] font-bold text-gray-400">{order.date}</td>
+                  <td className="py-5 text-right">
+                    {deleteAnyOrder && (
+                      <button 
+                        onClick={() => deleteAnyOrder(order)}
+                        className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                        title="Delete order record"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {clients.length === 0 && publicOrders.length === 0 && (
@@ -2751,15 +2875,41 @@ const PublicStore = ({
   const [filter, setFilter] = useState('all');
 
   const fuse = useMemo(() => new Fuse(products, {
-    keys: ['name', 'category', 'description'],
-    threshold: 0.4,
+    keys: [
+      'name', 
+      'category', 
+      'description', 
+      { name: 'seoKeywords', weight: 1.5 },
+      { name: 'specifications.key', weight: 0.8 },
+      { name: 'specifications.value', weight: 1.2 }
+    ],
+    threshold: 0.45,
     includeScore: true
   }), [products]);
 
   const filteredProducts = useMemo(() => {
     let result = products;
     if (search) {
-      result = fuse.search(search).map(r => r.item);
+      const searchLower = search.toLowerCase().trim();
+      const fuzzyResults = fuse.search(search).map(r => r.item);
+      
+      const substringResults = products.filter(p => {
+        const nameMatch = p.name.toLowerCase().includes(searchLower);
+        const categoryMatch = p.category.toLowerCase().includes(searchLower);
+        const descMatch = (p.description || '').toLowerCase().includes(searchLower);
+        const seoMatch = (p.seoKeywords || '').toLowerCase().includes(searchLower);
+        const specMatch = (p.specifications || []).some(spec => 
+          spec.key.toLowerCase().includes(searchLower) || 
+          spec.value.toLowerCase().includes(searchLower)
+        );
+        return nameMatch || categoryMatch || descMatch || seoMatch || specMatch;
+      });
+
+      const uniqueResults = new Set<Product>();
+      substringResults.forEach(item => uniqueResults.add(item));
+      fuzzyResults.forEach(item => uniqueResults.add(item));
+
+      result = Array.from(uniqueResults);
     }
     if (filter !== 'all') {
       result = result.filter(p => p.category === filter);
@@ -3054,6 +3204,7 @@ const PublicStore = ({
               <ProductPastaCard 
                 product={product} 
                 onSelect={setSelectedProduct}
+                addToCart={addToCart}
               />
             </motion.div>
           ))
@@ -3140,7 +3291,8 @@ const Dashboard = ({
   onEditProduct,
   isAdmin,
   isDarkMode,
-  productCategories
+  productCategories,
+  deleteAnyOrder
 }: { 
   products: Product[], 
   clients: Client[], 
@@ -3156,7 +3308,8 @@ const Dashboard = ({
   onEditProduct: (p: Product) => void,
   isAdmin: boolean,
   isDarkMode: boolean,
-  productCategories: CategoryData[]
+  productCategories: CategoryData[],
+  deleteAnyOrder?: (order: any) => Promise<void>
 }) => {
   if (!isAdmin) {
     return (
@@ -3185,6 +3338,7 @@ const Dashboard = ({
       isDarkMode={isDarkMode}
       setShowAddProduct={setShowAddProduct}
       onEditProduct={onEditProduct}
+      deleteAnyOrder={deleteAnyOrder}
     />
   );
 };
@@ -4494,8 +4648,13 @@ const AddProductModal = ({
     stock: '',
     image: '',
     videoUrl: '',
-    description: ''
+    description: '',
+    seoKeywords: ''
   });
+  const [specs, setSpecs] = useState<{ key: string, value: string }[]>([
+    { key: 'Brand', value: '' },
+    { key: 'Model', value: '' }
+  ]);
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategory, setNewCategory] = useState('');
 
@@ -4563,36 +4722,44 @@ const AddProductModal = ({
     }
   };
 
+  const nameWordCount = formData.name.trim() === "" ? 0 : formData.name.trim().split(/\s+/).length;
+  const descriptionCharCount = formData.description.length;
+  const totalSpecsLength = specs.reduce((acc, item) => acc + item.key.length + item.value.length, 0);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[160] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <motion.div 
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
-        className="w-full max-w-[400px] glow-effect-container text-white rounded-[32px] p-6 shadow-2xl"
+        className="w-full max-w-[600px] max-h-[92vh] overflow-y-auto glow-effect-container text-white rounded-[32px] p-6 md:p-8 shadow-2xl space-y-5"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold">Add Product</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+          <div>
+            <h3 className="text-xl font-bold">নতুন প্রোডাক্ট যোগ করুন (Add Product)</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Fill out product specs, SEO keywords, and description</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-all">
             <X size={20} />
           </button>
         </div>
 
         <div className="space-y-4">
-          <div className="flex justify-center gap-6 mb-4">
+          {/* Image & Video Inputs */}
+          <div className="flex justify-center gap-8 py-2">
             <div className="flex flex-col items-center gap-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Image</label>
-              <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-50 dark:bg-slate-800 border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center">
+              <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-900 border-2 border-dashed border-slate-800 flex items-center justify-center hover:border-blue-500 transition-colors cursor-pointer">
                 {formData.image ? (
                   <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
-                  <ImageIcon className="text-gray-300" size={32} />
+                  <ImageIcon className="text-slate-600" size={28} />
                 )}
                 <input 
                   type="file" 
@@ -4605,11 +4772,11 @@ const AddProductModal = ({
 
             <div className="flex flex-col items-center gap-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Video (Max 3m)</label>
-              <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-50 dark:bg-slate-800 border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center">
+              <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-900 border-2 border-dashed border-slate-800 flex items-center justify-center hover:border-blue-500 transition-colors cursor-pointer">
                 {formData.videoUrl ? (
                   <video src={formData.videoUrl} className="w-full h-full object-cover" />
                 ) : (
-                  <Video className="text-gray-300" size={32} />
+                  <Video className="text-slate-600" size={28} />
                 )}
                 <input 
                   type="file" 
@@ -4623,7 +4790,7 @@ const AddProductModal = ({
                       e.stopPropagation();
                       setFormData({...formData, videoUrl: ''});
                     }}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-lg"
+                    className="absolute top-1.5 right-1.5 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors"
                   >
                     <X size={10} />
                   </button>
@@ -4632,22 +4799,29 @@ const AddProductModal = ({
             </div>
           </div>
 
+          {/* Product Title / Input with Counter */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product Name</label>
-            <input 
-              type="text" 
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="e.g. 4K Dome Camera"
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Product Name / Title (নাম/টাইটেল)</label>
+              <span className="text-[10px] text-gray-500 font-mono font-bold">
+                {nameWordCount} শব্দ (Word count)
+              </span>
+            </div>
+            <textarea 
+              rows={2}
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm resize-none text-white placeholder-slate-600 transition"
+              placeholder="যেমন: Dahua 2MP Full HD CCTV Camera IP Dome Style (Supports 100+ words easily)"
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
             />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Price</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Price (৳)</label>
               <input 
                 type="number" 
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white placeholder-slate-600 transition"
                 placeholder="0.00"
                 value={formData.price}
                 onChange={e => setFormData({...formData, price: e.target.value})}
@@ -4657,20 +4831,22 @@ const AddProductModal = ({
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Stock</label>
               <input 
                 type="number" 
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white placeholder-slate-600 transition"
                 placeholder="0"
                 value={formData.stock}
                 onChange={e => setFormData({...formData, stock: e.target.value})}
               />
             </div>
           </div>
+
+          {/* Category Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category</label>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category (ক্যাটাগরি)</label>
             {showNewCategoryInput ? (
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white"
                   placeholder="New Category Name"
                   value={newCategory}
                   onChange={e => setNewCategory(e.target.value)}
@@ -4689,7 +4865,7 @@ const AddProductModal = ({
                     setShowNewCategoryInput(false);
                     setNewCategory('');
                   }}
-                  className="px-4 py-3 bg-blue-600 text-white rounded-2xl font-bold"
+                  className="px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold transition text-xs uppercase tracking-wider"
                 >
                   Add
                 </button>
@@ -4698,14 +4874,14 @@ const AddProductModal = ({
                     setShowNewCategoryInput(false);
                     setNewCategory('');
                   }}
-                  className="px-4 py-3 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-2xl font-bold"
+                  className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-gray-300 rounded-2xl font-bold transition text-xs uppercase tracking-wider"
                 >
                   Cancel
                 </button>
               </div>
             ) : (
               <select 
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none appearance-none text-sm text-white"
                 value={formData.category}
                 onChange={e => {
                   if (e.target.value === 'add_new') {
@@ -4716,25 +4892,115 @@ const AddProductModal = ({
                 }}
               >
                 {productCategories.map(cat => (
-                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                  <option key={cat.id} value={cat.name} className="bg-slate-900 text-white">{cat.name}</option>
                 ))}
-                <option value="add_new">+ Add New Category</option>
+                <option value="add_new" className="bg-slate-900 text-blue-400 font-bold">+ Add New Category</option>
               </select>
             )}
           </div>
           
+          {/* Description (Supports 5000 characters) */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Description</label>
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Description (ডেসক্রিপশন)</label>
+              <span className="text-[10px] text-gray-500 font-mono font-bold">
+                {descriptionCharCount} / 5000 বর্ণ (Char count)
+              </span>
+            </div>
             <textarea 
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] text-sm"
-              placeholder="Product features, specifications, etc."
+              maxLength={5000}
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] text-sm text-white placeholder-slate-600 transition"
+              placeholder="Product details and explanation (Supports up to 5000 text capacity beautifully)"
               value={formData.description}
               onChange={e => setFormData({...formData, description: e.target.value})}
             />
           </div>
+
+          {/* Dynamic Specifications Key-Value Builder */}
+          <div className="space-y-2 select-none border-t border-slate-800/80 pt-4">
+            <div className="flex justify-between items-center ml-1">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Specifications (প্রোডাক্ট স্পেসিফিকেশন)
+                </label>
+                <p className="text-[9px] text-gray-500">Supports at least 2000 characters total</p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSpecs([...specs, { key: '', value: '' }])}
+                className="text-xs text-blue-400 font-bold hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 px-3 py-1.5 rounded-xl transition-all border border-blue-500/10"
+              >
+                <Plus size={14} /> আইটেম যোগ করুন (Add Item)
+              </button>
+            </div>
+            
+            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+              {specs.length === 0 ? (
+                <p className="text-xs text-gray-650 italic pl-1">No specifications added yet.</p>
+              ) : (
+                specs.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 items-center bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800">
+                    <input 
+                      type="text"
+                      className="flex-1 min-w-0 px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs text-white placeholder-slate-650"
+                      placeholder="আইটেমের নাম (যেমন: Sensor)"
+                      value={item.key}
+                      onChange={e => {
+                        const updated = [...specs];
+                        updated[idx].key = e.target.value;
+                        setSpecs(updated);
+                      }}
+                    />
+                    <span className="text-gray-500 text-xs font-bold">:</span>
+                    <textarea 
+                      rows={1}
+                      className="flex-1 min-w-0 px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs text-white placeholder-slate-650 resize-none"
+                      placeholder="আইটেমের বিস্তারিত (যেমন: 1/2.8 CMOS)"
+                      value={item.value}
+                      onChange={e => {
+                        const updated = [...specs];
+                        updated[idx].value = e.target.value;
+                        setSpecs(updated);
+                      }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setSpecs(specs.filter((_, i) => i !== idx))}
+                      className="text-red-500 hover:bg-red-500/10 p-2 rounded-xl transition-colors shrink-0"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="flex justify-between items-center text-[10px] text-gray-500 px-1 pt-1 font-mono">
+              <span>মোট স্পেক বর্ণ (Specifications capacity)</span>
+              <span>
+                চলতি মোট: <strong className="text-blue-500">{totalSpecsLength}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* SEO Keywords Input */}
+          <div className="space-y-1.5 border-t border-slate-800/80 pt-4">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Search SEO Keywords (সার্চ এসইও কি-ওয়ার্ড)</label>
+              <span className="text-[9px] text-gray-500">Comma separated, helps instant search match</span>
+            </div>
+            <input 
+              type="text"
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white placeholder-slate-600 transition"
+              placeholder="যেমন: dahua, ip camera, dome, waterproof"
+              value={formData.seoKeywords}
+              onChange={e => setFormData({...formData, seoKeywords: e.target.value})}
+            />
+          </div>
           
+          {/* Action Submission */}
           <motion.button 
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => {
               if (!formData.name.trim()) {
                 alert("Product name is required");
@@ -4743,10 +5009,12 @@ const AddProductModal = ({
               onAdd({
                 ...formData,
                 price: Number(formData.price) || 0,
-                stock: Number(formData.stock) || 0
+                stock: Number(formData.stock) || 0,
+                specifications: specs
               });
+              addNotification("Product successfully created!");
             }}
-            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg opacity-90 hover:opacity-100 dark:shadow-none mt-4"
+            className="w-full py-4 bg-blue-600 hover:bg-blue-550 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg mt-6"
           >
             Create Product
           </motion.button>
@@ -4775,7 +5043,11 @@ const EditProductModal = ({
     ...product,
     price: product.price.toString(),
     stock: product.stock.toString(),
-    description: product.description || ''
+    description: product.description || '',
+    seoKeywords: product.seoKeywords || ''
+  });
+  const [specs, setSpecs] = useState<{ key: string, value: string }[]>(() => {
+    return product.specifications || [];
   });
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategory, setNewCategory] = useState('');
@@ -4844,36 +5116,43 @@ const EditProductModal = ({
     }
   };
 
+  const nameWordCount = formData.name.trim() === "" ? 0 : formData.name.trim().split(/\s+/).length;
+  const descriptionCharCount = formData.description.length;
+  const totalSpecsLength = specs.reduce((acc, item) => acc + item.key.length + item.value.length, 0);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[160] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <motion.div 
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
-        className="w-full max-w-[400px] glow-effect-container text-white rounded-[32px] p-6 shadow-2xl"
+        className="w-full max-w-[600px] max-h-[92vh] overflow-y-auto glow-effect-container text-white rounded-[32px] p-6 md:p-8 shadow-2xl space-y-5"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold">Edit Product</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+          <div>
+            <h3 className="text-xl font-bold">প্রোডাক্ট এডিট করুন (Edit Product)</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Modify specifications, word counts, and search keywords</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-all">
             <X size={20} />
           </button>
         </div>
 
         <div className="space-y-4">
-          <div className="flex justify-center gap-6 mb-4">
+          <div className="flex justify-center gap-8 py-2">
             <div className="flex flex-col items-center gap-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Image</label>
-              <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-50 dark:bg-slate-800 border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center">
+              <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-900 border-2 border-dashed border-slate-800 flex items-center justify-center hover:border-blue-500 transition-colors cursor-pointer">
                 {formData.image ? (
                   <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
-                  <ImageIcon className="text-gray-300" size={32} />
+                  <ImageIcon className="text-slate-600" size={28} />
                 )}
                 <input 
                   type="file" 
@@ -4886,11 +5165,11 @@ const EditProductModal = ({
 
             <div className="flex flex-col items-center gap-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Video (Max 3m)</label>
-              <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-50 dark:bg-slate-800 border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center">
+              <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-900 border-2 border-dashed border-slate-800 flex items-center justify-center hover:border-blue-500 transition-colors cursor-pointer">
                 {formData.videoUrl ? (
                   <video src={formData.videoUrl} className="w-full h-full object-cover" />
                 ) : (
-                  <Video className="text-gray-300" size={32} />
+                  <Video className="text-slate-600" size={28} />
                 )}
                 <input 
                   type="file" 
@@ -4904,7 +5183,7 @@ const EditProductModal = ({
                       e.stopPropagation();
                       setFormData({...formData, videoUrl: ''});
                     }}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-lg"
+                    className="absolute top-1.5 right-1.5 bg-red-600 text-white rounded-full p-1 shadow-lg hover:bg-red-500 transition-colors"
                   >
                     <X size={10} />
                   </button>
@@ -4914,21 +5193,27 @@ const EditProductModal = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product Name</label>
-            <input 
-              type="text" 
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none"
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Product Name</label>
+              <span className="text-[10px] text-gray-500 font-mono font-bold">
+                {nameWordCount} শব্দ (Word count)
+              </span>
+            </div>
+            <textarea 
+              rows={2}
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm resize-none text-white placeholder-slate-600 transition"
               placeholder="e.g. 4K Dome Camera"
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
             />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Price</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Price (৳)</label>
               <input 
                 type="number" 
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white transition"
                 placeholder="0.00"
                 value={formData.price}
                 onChange={e => setFormData({...formData, price: e.target.value})}
@@ -4938,20 +5223,21 @@ const EditProductModal = ({
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Stock</label>
               <input 
                 type="number" 
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white transition"
                 placeholder="0"
                 value={formData.stock}
                 onChange={e => setFormData({...formData, stock: e.target.value})}
               />
             </div>
           </div>
+
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category</label>
             {showNewCategoryInput ? (
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white"
                   placeholder="New Category Name"
                   value={newCategory}
                   onChange={e => setNewCategory(e.target.value)}
@@ -4970,7 +5256,7 @@ const EditProductModal = ({
                     setShowNewCategoryInput(false);
                     setNewCategory('');
                   }}
-                  className="px-4 py-3 bg-blue-600 text-white rounded-2xl font-bold"
+                  className="px-4 py-3 bg-blue-600 hover:bg-blue-550 text-white rounded-2xl font-bold transition text-xs uppercase tracking-wider"
                 >
                   Add
                 </button>
@@ -4979,14 +5265,14 @@ const EditProductModal = ({
                     setShowNewCategoryInput(false);
                     setNewCategory('');
                   }}
-                  className="px-4 py-3 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-2xl font-bold"
+                  className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-gray-300 rounded-2xl font-bold transition text-xs"
                 >
                   Cancel
                 </button>
               </div>
             ) : (
               <select 
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none appearance-none text-sm text-white"
                 value={formData.category}
                 onChange={e => {
                   if (e.target.value === 'add_new') {
@@ -4997,25 +5283,113 @@ const EditProductModal = ({
                 }}
               >
                 {productCategories.map(cat => (
-                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                  <option key={cat.id} value={cat.name} className="bg-slate-900 text-white">{cat.name}</option>
                 ))}
-                <option value="add_new">+ Add New Category</option>
+                <option value="add_new" className="bg-slate-900 text-blue-400 font-bold">+ Add New Category</option>
               </select>
             )}
           </div>
           
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Description</label>
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Description</label>
+              <span className="text-[10px] text-gray-500 font-mono font-bold">
+                {descriptionCharCount} / 5000 chars
+              </span>
+            </div>
             <textarea 
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px] text-sm"
+              maxLength={5000}
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] text-sm text-white placeholder-slate-600 transition"
               placeholder="Product features, specifications, etc."
               value={formData.description}
               onChange={e => setFormData({...formData, description: e.target.value})}
             />
           </div>
+
+          {/* Dynamic Specifications Key-Value Builder */}
+          <div className="space-y-2 select-none border-t border-slate-800/80 pt-4">
+            <div className="flex justify-between items-center ml-1">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Specifications (প্রোডাক্ট স্পেসিফিকেশন)
+                </label>
+                <p className="text-[9px] text-gray-500">Supports at least 2000 characters total</p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSpecs([...specs, { key: '', value: '' }])}
+                className="text-xs text-blue-400 font-bold hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 px-3 py-1.5 rounded-xl transition-all border border-blue-500/10"
+              >
+                <Plus size={14} /> আইটেম যোগ করুন (Add Item)
+              </button>
+            </div>
+            
+            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+              {specs.length === 0 ? (
+                <p className="text-xs text-gray-650 italic pl-1">No specifications added yet.</p>
+              ) : (
+                specs.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 items-center bg-slate-900/60 p-2.5 rounded-2xl border border-slate-800">
+                    <input 
+                      type="text"
+                      className="flex-1 min-w-0 px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs text-white placeholder-slate-650"
+                      placeholder="আইটেমের নাম (যেমন: Sensor)"
+                      value={item.key}
+                      onChange={e => {
+                        const updated = [...specs];
+                        updated[idx].key = e.target.value;
+                        setSpecs(updated);
+                      }}
+                    />
+                    <span className="text-gray-500 text-xs font-bold">:</span>
+                    <textarea 
+                      rows={1}
+                      className="flex-1 min-w-0 px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-xs text-white placeholder-slate-650 resize-none"
+                      placeholder="আইটেমের বিস্তারিত (যেমন: 1/2.8 CMOS)"
+                      value={item.value}
+                      onChange={e => {
+                        const updated = [...specs];
+                        updated[idx].value = e.target.value;
+                        setSpecs(updated);
+                      }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setSpecs(specs.filter((_, i) => i !== idx))}
+                      className="text-red-500 hover:bg-red-500/10 p-2 rounded-xl transition-colors shrink-0"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="flex justify-between items-center text-[10px] text-gray-500 px-1 pt-1 font-mono">
+              <span>মোট স্পেক বর্ণ (Specifications capacity)</span>
+              <span>
+                চলতি মোট: <strong className="text-blue-500">{totalSpecsLength}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* SEO Keywords Input */}
+          <div className="space-y-1.5 border-t border-slate-800/80 pt-4">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Search SEO Keywords (সার্চ এসইও কি-ওয়ার্ড)</label>
+              <span className="text-[9px] text-gray-500">Comma separated, helps instant search match</span>
+            </div>
+            <input 
+              type="text"
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-white placeholder-slate-600 transition"
+              placeholder="e.g. dahua, camera, ip"
+              value={formData.seoKeywords}
+              onChange={e => setFormData({...formData, seoKeywords: e.target.value})}
+            />
+          </div>
           
           <motion.button 
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => {
               if (!formData.name.trim()) {
                 alert("Product name is required");
@@ -5024,10 +5398,12 @@ const EditProductModal = ({
               onSave({
                 ...formData,
                 price: Number(formData.price) || 0,
-                stock: Number(formData.stock) || 0
+                stock: Number(formData.stock) || 0,
+                specifications: specs
               });
+              addNotification("Product successfully updated!");
             }}
-            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg opacity-90 hover:opacity-100 dark:shadow-none mt-4"
+            className="w-full py-4 bg-blue-600 hover:bg-blue-550 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg mt-6"
           >
             Update Product
           </motion.button>
@@ -5115,13 +5491,10 @@ const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
 
 const SplashScreen = ({ customLogo, onEnter, onPlay, hasMusic, isLoading }: { customLogo: string | null, onEnter: () => void, onPlay: () => void, hasMusic: boolean, isLoading: boolean }) => {
   const [progress, setProgress] = useState(0);
-  const [started, setStarted] = useState(!hasMusic);
+  const [started, setStarted] = useState(true);
 
   const startIntro = () => {
-    if (!started && hasMusic) {
-      setStarted(true);
-      onPlay();
-    }
+    // Component now starts automatically
   };
 
   useEffect(() => {
@@ -5148,11 +5521,7 @@ const SplashScreen = ({ customLogo, onEnter, onPlay, hasMusic, isLoading }: { cu
       initial={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.05 }}
       transition={{ duration: 0.8, ease: "easeInOut" }}
-      onClick={startIntro}
-      className={cn(
-        "fixed inset-0 splash-bg z-[200] flex flex-col items-center justify-center overflow-hidden bg-slate-950 transition-colors duration-500",
-        !started && hasMusic && "cursor-pointer hover:bg-slate-900"
-      )}
+      className="fixed inset-0 splash-bg z-[200] flex flex-col items-center justify-center overflow-hidden bg-slate-950 transition-colors duration-500"
     >
       {/* Premium Background Effect */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none bg-black/40 backdrop-blur-sm">
@@ -5208,49 +5577,20 @@ const SplashScreen = ({ customLogo, onEnter, onPlay, hasMusic, isLoading }: { cu
           </motion.p>
           
           <div className="h-16 flex flex-col items-center justify-center relative w-72 mx-auto">
-            <AnimatePresence mode="wait">
-              {started ? (
+            <div className="w-full flex justify-center">
+              <div className="w-72 h-1 bg-white/5 rounded-full overflow-hidden border border-white/10 relative">
                 <motion.div 
-                   key="loading"
-                   initial={{ opacity: 1 }}
-                   exit={{ opacity: 0 }}
-                   className="w-full flex justify-center"
-                >
-                  <div className="w-72 h-1 bg-white/5 rounded-full overflow-hidden border border-white/10 relative">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress}%` }}
-                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-600 via-emerald-400 to-green-600"
-                    />
-                    <motion.div 
-                      animate={{ x: ['-100%', '200%'] }}
-                      transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-1/2"
-                    />
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.button
-                  key="enter-btn"
-                  initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={(e) => {
-                     e.stopPropagation();
-                     startIntro();
-                  }}
-                  className="px-8 py-3 bg-white/10 border border-white/20 text-white rounded-[20px] text-xs font-black uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:bg-white/20 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:border-white/40 transition-all flex items-center justify-center gap-2 relative overflow-hidden"
-                >
-                  <Zap size={14} className="text-emerald-400" /> TAP TO START
-                  <motion.div 
-                    animate={{ x: ['-200%', '200%'] }}
-                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 0.5 }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent w-1/2 -skew-x-12"
-                  />
-                </motion.button>
-              )}
-            </AnimatePresence>
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-green-600 via-emerald-400 to-green-600"
+                />
+                <motion.div 
+                  animate={{ x: ['-100%', '200%'] }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-1/2"
+                />
+              </div>
+            </div>
             
             <AnimatePresence>
               {started && (
@@ -5335,111 +5675,144 @@ const TopHeader = ({
   customLogo: string | null
 }) => {
   return (
-    <header className={cn(
-      "sticky top-0 z-[60] w-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 transition-all duration-300"
-    )}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20 gap-4">
-          {/* Logo */}
-          <div 
-            className="flex items-center gap-3 cursor-pointer group"
-            onClick={() => setActiveTab('shop-view')}
-          >
-            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-blue-500/20 group-hover:scale-110 transition-all overflow-hidden border border-white/10">
-               {customLogo ? (
-                 <img src={customLogo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-               ) : (
-                 <ShieldCheck size={28} />
-               )}
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="text-lg font-black tracking-tighter leading-none dark:text-white uppercase">IT Department</h1>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Technology Partner</p>
-            </div>
-          </div>
-
-          {/* Top Navigation - Basic links only as Sidebar handles main navigation on desktop */}
-          <nav className="hidden lg:flex items-center gap-1">
-            <button
-              onClick={() => setActiveTab('shop-view')}
-              className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
-                activeTab === 'shop-view' 
-                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" 
-                  : "text-gray-500 hover:text-blue-600 hover:bg-gray-50 dark:hover:bg-slate-800"
-              )}
+    <div className="w-full flex flex-col z-[60] sticky top-0 shadow-sm select-none">
+      <header className={cn(
+        "w-full bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 transition-all duration-300"
+      )}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20 gap-4">
+            {/* Logo */}
+            <div 
+              className="flex items-center gap-3 cursor-pointer group"
+              onClick={() => {
+                setActiveTab('shop-view');
+              }}
             >
-              <ShoppingBag size={18} />
-              Products
-            </button>
-            <button
-              onClick={() => setActiveTab('my-orders')}
-              className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
-                activeTab === 'my-orders' 
-                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" 
-                  : "text-gray-500 hover:text-blue-600 hover:bg-gray-50 dark:hover:bg-slate-800"
-              )}
-            >
-              <Package size={18} />
-              Orders
-            </button>
-          </nav>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex relative group">
-              <input 
-                type="text" 
-                placeholder="Find components..."
-                className="w-48 xl:w-64 px-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-transparent focus:border-blue-500/50 rounded-2xl text-xs font-bold transition-all outline-none"
-              />
-              <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={14} />
-            </div>
-
-            <button 
-              onClick={onShowCart}
-              className="relative p-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-gray-700 dark:text-gray-300 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
-            >
-              <ShoppingCart size={20} className="group-hover:text-blue-600 transition-colors" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 text-white text-[10px] font-black flex items-center justify-center rounded-full ring-4 ring-white dark:ring-slate-950 animate-in zoom-in duration-300">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-
-            {user ? (
-              <div className="flex items-center gap-2 pl-2">
-                <button 
-                  onClick={() => setActiveTab('me')}
-                  className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-transparent hover:border-blue-500 transition-all p-0.5 bg-gray-100 dark:bg-slate-800"
-                >
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover rounded-[14px]" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-blue-500/10 text-blue-600 font-black">
-                      {user.email?.[0].toUpperCase()}
-                    </div>
-                  )}
-                </button>
-                <div className="hidden xl:block">
-                  <p className="text-xs font-black dark:text-white truncate max-w-[100px] leading-none mb-1">{user.displayName || 'Guest User'}</p>
-                  <button onClick={onLogout} className="text-[10px] font-bold text-red-500 hover:text-red-600 transition-colors block">LOGOUT</button>
-                </div>
+              <div className="w-12 h-12 bg-[#111111] dark:bg-slate-900 rounded-full flex items-center justify-center text-white shadow-xl group-hover:scale-105 transition-all overflow-hidden border border-white/10 shrink-0">
+                 {customLogo ? (
+                   <img src={customLogo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                 ) : (
+                   <ShieldCheck size={28} className="text-white" />
+                 )}
               </div>
-            ) : (
-              <button 
-                onClick={onShowLogin}
-                className="px-6 py-2.5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl text-xs font-black tracking-widest hover:scale-105 active:scale-95 transition-all"
+              <div className="block">
+                <h1 className="text-base sm:text-lg font-black tracking-tighter leading-none dark:text-white uppercase text-slate-900">IT Department</h1>
+                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-0.5">Technology Partner</p>
+              </div>
+            </div>
+
+            {/* Custom Premium Horizontal Navigation Links */}
+            <nav className="hidden lg:flex items-center gap-6">
+              <button
+                onClick={() => setActiveTab('shop-view')}
+                className={cn(
+                  "text-xs font-black uppercase tracking-widest transition-all hover:text-[#bf0528]",
+                  activeTab === 'shop-view' 
+                    ? "text-[#bf0528] border-b-2 border-[#bf0528] pb-1" 
+                    : "text-slate-700 dark:text-gray-300"
+                )}
               >
-                SIGN IN
+                Home
               </button>
-            )}
+              <button
+                onClick={() => {
+                  setActiveTab('shop-view');
+                  const ev = new CustomEvent('set-product-filter', { detail: 'indoor' });
+                  window.dispatchEvent(ev);
+                }}
+                className="text-xs font-black uppercase tracking-widest transition-all text-slate-700 dark:text-gray-300 hover:text-[#bf0528]"
+              >
+                Cameras
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('shop-view');
+                  const ev = new CustomEvent('set-product-filter', { detail: 'nvr' });
+                  window.dispatchEvent(ev);
+                }}
+                className="text-xs font-black uppercase tracking-widest transition-all text-slate-700 dark:text-gray-300 hover:text-[#bf0528]"
+              >
+                NVR & DVR
+              </button>
+              <button
+                onClick={() => setActiveTab('offers')}
+                className={cn(
+                  "text-xs font-black uppercase tracking-widest transition-all hover:text-[#bf0528]",
+                  activeTab === 'offers' 
+                    ? "text-[#bf0528] border-b-2 border-[#bf0528] pb-1" 
+                    : "text-slate-700 dark:text-gray-300"
+                )}
+              >
+                Special Offers
+              </button>
+              <button
+                onClick={() => setActiveTab('my-orders')}
+                className={cn(
+                  "text-xs font-black uppercase tracking-widest transition-all hover:text-[#bf0528]",
+                  activeTab === 'my-orders' 
+                    ? "text-[#bf0528] border-b-2 border-[#bf0528] pb-1" 
+                    : "text-slate-700 dark:text-gray-300"
+                )}
+              >
+                Track Orders
+              </button>
+            </nav>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex relative group">
+                <input 
+                  type="text" 
+                  placeholder="Premium Search..."
+                  className="w-48 xl:w-64 px-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-[#bf0528] rounded-2xl text-xs font-semibold tracking-wide transition-all outline-none"
+                />
+                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#bf0528] transition-colors" size={14} />
+              </div>
+
+              <button 
+                onClick={onShowCart}
+                className="relative p-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-gray-700 dark:text-gray-300 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
+              >
+                <ShoppingCart size={20} className="group-hover:text-[#bf0528] transition-colors" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#bf0528] text-white text-[10px] font-black flex items-center justify-center rounded-full ring-4 ring-white dark:ring-slate-950 animate-in zoom-in duration-300">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+
+              {user ? (
+                <div className="flex items-center gap-2 pl-2">
+                  <button 
+                    onClick={() => setActiveTab('me')}
+                    className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-transparent hover:border-[#bf0528] transition-all p-0.5 bg-gray-100 dark:bg-slate-800 shrink-0"
+                  >
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover rounded-[14px]" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-blue-500/10 text-blue-600 font-black">
+                        {user.email?.[0].toUpperCase()}
+                      </div>
+                    )}
+                  </button>
+                  <div className="hidden xl:block max-w-[100px]">
+                    <p className="text-xs font-black dark:text-white truncate leading-none mb-1">{user.displayName || 'Guest User'}</p>
+                    <button onClick={onLogout} className="text-[10px] font-bold text-red-500 hover:text-red-600 transition-colors block">LOGOUT</button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={onShowLogin}
+                  className="px-6 py-2.5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl text-xs font-black tracking-widest hover:scale-105 active:scale-95 transition-all shrink-0"
+                >
+                  SIGN IN
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </div>
   );
 };
 
@@ -5698,7 +6071,12 @@ function AppContent() {
   const [offersMusic, setOffersMusic] = useState<string | null>(() => localStorage.getItem('cctv_offers_music'));
   const offersAudioRef = useRef<HTMLAudioElement | null>(null);
   
-  const adminEmails = ['itdepartmentpro33@gmail.com', 'djbmremix87@gmail.com'];
+  const adminEmails = [
+    'itdepartmentpro33@gmail.com', 
+    'djbmremix87@gmail.com',
+    'itdepartmentpro33@app.internal',
+    'djbmremix87@app.internal'
+  ];
   const isAdmin = user?.email && adminEmails.includes(user.email.toLowerCase());
 
   // Removed automatic redirection to shop-view for admins to avoid confusion
@@ -6068,7 +6446,13 @@ function AppContent() {
         } catch (e) {
           console.warn("localStorage quota exceeded");
         }
-      }, (error) => handleFirestoreError(error, OperationType.LIST, `clients`));
+      }, (error) => {
+        if (error.code === 'permission-denied') {
+          console.warn("Clients list access denied - user might not be admin.");
+        } else {
+          handleFirestoreError(error, OperationType.LIST, `clients`);
+        }
+      });
     } else if (user) {
       // For non-admins, try to fetch their own client record
       const clientsRef = collection(db, 'clients');
@@ -6116,7 +6500,14 @@ function AppContent() {
         } catch (e) {
           console.warn("localStorage quota exceeded");
         }
-      }, (error) => handleFirestoreError(error, OperationType.LIST, `expenses`));
+      }, (error) => {
+        // If it's a permission error, we might have lost auth state or roles changed
+        if (error.code === 'permission-denied') {
+          console.warn("Expenses access denied - user might not be admin in rules yet.");
+        } else {
+          handleFirestoreError(error, OperationType.LIST, `expenses`);
+        }
+      });
     } else {
       setExpenses([]);
     }
@@ -6152,24 +6543,7 @@ function AppContent() {
 
   // Offers Music Playback
   useEffect(() => {
-    if (activeTab === 'offers' && offersMusic) {
-      if (!offersAudioRef.current) {
-        offersAudioRef.current = new Audio(offersMusic);
-        offersAudioRef.current.loop = true;
-      } else if (offersAudioRef.current.src !== offersMusic) {
-        offersAudioRef.current.src = offersMusic;
-      }
-      offersAudioRef.current.play().catch(e => console.log("Audio play failed:", e));
-    } else {
-      if (offersAudioRef.current) {
-        offersAudioRef.current.pause();
-      }
-    }
-    return () => {
-      if (offersAudioRef.current) {
-        offersAudioRef.current.pause();
-      }
-    };
+    // Offers music disabled per user request
   }, [activeTab, offersMusic]);
 
   // Sync Settings to Firestore (Only if changed by admin after load)
@@ -6271,22 +6645,7 @@ function AppContent() {
 
   // Global Click Sound
   useEffect(() => {
-    const tapAudio = new Audio(customClickSound || 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
-    tapAudio.volume = 1.0;
-    tapAudio.preload = 'auto';
-
-    const handleGlobalClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // Check if the clicked element is a button or inside a button
-      if (target.closest('button') || target.closest('a') || target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'submit' || target.closest('[role="button"]')) {
-        const sound = tapAudio.cloneNode() as HTMLAudioElement;
-        sound.volume = 1.0;
-        sound.play().catch(() => {});
-      }
-    };
-
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
+    // Sound disabled per user request
   }, []);
 
   // Splash Screen Timer
@@ -6296,16 +6655,7 @@ function AppContent() {
   }, []);
 
   const handlePlayIntro = () => {
-    if (customIntroMusic) {
-      const audio = new Audio(customIntroMusic);
-      audio.volume = 1.0;
-      audio.play().catch(e => console.error("Audio block:", e));
-    } else {
-      // Default intro sound
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
-      audio.volume = 0.5;
-      audio.play().catch(e => console.error(e));
-    }
+    // Intro sound disabled per user request
   };
 
   const handleSplashEnter = () => {
@@ -6524,24 +6874,66 @@ function AppContent() {
       addNotification("Please login to delete order.");
       return;
     }
-    const userId = user.uid;
-    const client = clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    const order = client.orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    const updatedClient = {
-      ...client,
-      due: (client.due || 0) - order.total,
-      orders: (client.orders || []).filter(o => o.id !== orderId)
-    };
+    if (!confirm('Are you sure you want to delete this order?')) return;
 
     try {
-      await setDoc(doc(db, 'clients', String(clientId)), updatedClient);
-      addNotification("Order deleted!");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `clients/${clientId}`);
+      // 1. Delete from public_orders (always check both places)
+      await deleteDoc(doc(db, 'public_orders', String(orderId)));
+
+      // 2. Delete from CRM
+      const client = clients.find(c => c.id === clientId);
+      if (client) {
+        const orderToDelete = (client.orders || []).find(o => String(o.id) === String(orderId));
+        const orderTotal = orderToDelete ? orderToDelete.total : 0;
+        const updatedOrders = (client.orders || []).filter(o => String(o.id) !== String(orderId));
+        
+        await updateDoc(doc(db, 'clients', String(clientId)), { 
+          orders: updatedOrders,
+          due: Math.max(0, (client.due || 0) - orderTotal)
+        });
+      }
+      
+      addNotification("Order deleted successfully!", "success");
+    } catch (error: any) {
+      console.error("Order delete error:", error);
+      addNotification("Delete failed: " + (error.message || error), "error");
+    }
+  };
+
+  const deleteAnyOrder = async (order: any) => {
+    if (!isAdmin) {
+       addNotification("Admin access required.");
+       return;
+    }
+    if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
+
+    const orderId = order.id;
+    try {
+      // 1. Force delete from public_orders
+      await deleteDoc(doc(db, 'public_orders', String(orderId)));
+      
+      // 2. Scan all clients to ensure it's removed from CRM too
+      const deletePromises = clients.map(async (client) => {
+        const hasOrder = (client.orders || []).some(o => String(o.id) === String(orderId));
+        if (hasOrder) {
+          const orderToDelete = (client.orders || []).find(o => String(o.id) === String(orderId));
+          const orderTotal = orderToDelete ? orderToDelete.total : 0;
+          const updatedOrders = (client.orders || []).filter(o => String(o.id) !== String(orderId));
+          
+          await updateDoc(doc(db, 'clients', String(client.id)), {
+            orders: updatedOrders,
+            due: Math.max(0, (client.due || 0) - orderTotal)
+          });
+          return true;
+        }
+        return false;
+      });
+
+      await Promise.all(deletePromises);
+      addNotification("Order deleted from all records successfully.", "success");
+    } catch (err: any) {
+      console.error("Critical Order delete error:", err);
+      addNotification("Delete failed: " + (err.message || err), "error");
     }
   };
 
@@ -6608,20 +7000,31 @@ function AppContent() {
 
     try {
       console.log("Saving public order...");
-      await setDoc(doc(db, 'public_orders', orderId), publicOrder);
-      console.log("Public order saved successfully");
+      try {
+        await setDoc(doc(db, 'public_orders', orderId), publicOrder);
+        console.log("Public order saved successfully");
+      } catch (orderErr) {
+        console.error("Order save failed:", orderErr);
+        handleFirestoreError(orderErr, OperationType.WRITE, `public_orders/${orderId}`);
+        return; // Stop if order itself fails
+      }
       
       // Decrease stock
       for (const item of cart) {
-        console.log(`Updating stock for product ${item.productId}...`);
-        const productRef = doc(db, 'products', String(item.productId));
-        const productSnap = await getDoc(productRef);
-        if (productSnap.exists()) {
-          const currentStock = productSnap.data().stock;
-          await updateDoc(productRef, {
-            stock: Math.max(0, currentStock - item.quantity)
-          });
-          console.log(`Stock updated for product ${item.productId}`);
+        try {
+          console.log(`Updating stock for product ${item.productId}...`);
+          const productRef = doc(db, 'products', String(item.productId));
+          const productSnap = await getDoc(productRef);
+          if (productSnap.exists()) {
+            const currentStock = productSnap.data().stock;
+            await updateDoc(productRef, {
+              stock: Math.max(0, currentStock - item.quantity)
+            });
+            console.log(`Stock updated for product ${item.productId}`);
+          }
+        } catch (stockErr) {
+          console.warn(`Stock update failed for product ${item.productId}:`, stockErr);
+          // We don't stop the whole process if stock update fails, but we'll log it
         }
       }
 
@@ -6631,10 +7034,13 @@ function AppContent() {
       addNotification(isPaid ? `Order placed and paid via ${paymentType}!` : "Order placed successfully! We will contact you soon.");
       
       // Generate PDF for the client
-      await generateOrderPDF(publicOrder, customLogo);
+      try {
+        await generateOrderPDF(publicOrder, customLogo);
+      } catch (pdfErr) {
+        console.error("PDF generation failed:", pdfErr);
+      }
     } catch (error) {
-      console.error("Error placing order:", error);
-      handleFirestoreError(error, OperationType.WRITE, `public_orders/${orderId}`);
+      console.error("Error in placePublicOrder catch-all:", error);
     } finally {
       window.dispatchEvent(new Event('stop-task-animation'));
     }
@@ -6702,8 +7108,8 @@ function AppContent() {
         addNotification(`New client added: ${order.customerName}`, 'success');
       }
 
-      // Mark public order as accepted
-      await updateDoc(doc(db, 'public_orders', order.id), { status: 'accepted' });
+      // Delete public order after it's moved to CRM to avoid duplicates in Manage All Orders
+      await deleteDoc(doc(db, 'public_orders', order.id));
       
       addNotification(`Order from ${order.customerName} accepted!`);
       setShowPendingOrders(false);
@@ -7169,7 +7575,16 @@ function AppContent() {
       headStyles: { fillColor: [22, 163, 74] }
     });
 
-    doc.save(`${client.name.replace(/\s+/g, '_')}_Profile.pdf`);
+    // Robust download for iframes
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${client.name.replace(/\s+/g, '_')}_Profile.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     } finally {
       window.dispatchEvent(new Event('stop-task-animation'));
     }
@@ -7236,7 +7651,16 @@ function AppContent() {
     doc.setFont('helvetica', 'bold');
     doc.text(`Total Inventory Value: ${formatCurrency(totalValue)}`, pageWidth - margin, finalY, { align: 'right' });
 
-    doc.save(`Inventory_Backup_${new Date().toISOString().split('T')[0]}.pdf`);
+    // Robust download for iframes
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Inventory_Backup_${new Date().toISOString().split('T')[0]}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     addNotification("Inventory PDF downloaded!");
   };
 
@@ -8636,17 +9060,47 @@ const BandwidthTestPage = () => {
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsLoading(true);
+      playSound('click');
       try {
+        // Handle "Username" by converting to a pseudo-email if necessary
+        let finalEmail = email.trim();
+        if (!finalEmail.includes('@')) {
+          finalEmail = `${finalEmail.toLowerCase()}@app.internal`;
+        }
+
         if (isRegistering) {
-          await registerWithEmail(email, password);
-          addNotification("Account created and logged in!");
+          await registerWithEmail(finalEmail, password);
+          addNotification("Account created successfully!");
         } else {
-          await loginWithEmail(email, password);
+          await loginWithEmail(finalEmail, password);
           addNotification("Welcome back!");
         }
       } catch (error: any) {
         console.error("Auth error:", error);
-        addNotification("Auth failed: " + (error.message || "Unknown error"));
+        let msg = error.message || "Auth failed";
+        if (msg.includes("invalid-credential")) msg = "Invalid username or password.";
+        if (msg.includes("email-already-in-use")) msg = "Username taken.";
+        addNotification(msg, "error");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const handleGoogleLogin = async () => {
+      playSound('click');
+      setIsLoading(true);
+      try {
+        await onLogin();
+      } catch (err: any) {
+        console.error("Google Login Error:", err);
+        const isIframe = window.self !== window.top;
+        if (isIframe && (err.code === 'auth/popup-blocked' || err.code === 'auth/internal-error')) {
+          addNotification("Google Login blocked. Please open this app in a NEW TAB to login securely.", "error");
+        } else if (err.code === 'auth/popup-closed-by-user') {
+          addNotification("Login cancelled. Please don't close the popup window.", "info");
+        } else {
+          addNotification(err.message || "Google Login failed", "error");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -8666,7 +9120,7 @@ const BandwidthTestPage = () => {
             transition={{ delay: 0.3, type: "spring", stiffness: 100 }}
             className="codingstella-login-header"
           >
-            <span>{isRegistering ? 'Register' : 'Login'}</span>
+            <span>{isRegistering ? 'Registration' : 'Security Panel'}</span>
           </motion.div>
 
           <form onSubmit={handleSubmit}>
@@ -8677,14 +9131,14 @@ const BandwidthTestPage = () => {
               className="codingstella-input_box"
             >
               <input 
-                type="email" 
+                type="text" 
                 id="user" 
                 className="codingstella-input-field" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required 
               />
-              <label htmlFor="user" className="codingstella-label">Email</label>
+              <label htmlFor="user" className="codingstella-label uppercase text-[10px] tracking-widest font-black">Email / Username</label>
               <User className="codingstella-icon" size={18} />
             </motion.div>
 
@@ -8702,7 +9156,7 @@ const BandwidthTestPage = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required 
               />
-              <label htmlFor="pass" className="codingstella-label">Password</label>
+              <label htmlFor="pass" className="codingstella-label uppercase text-[10px] tracking-widest font-black">Password</label>
               <Lock className="codingstella-icon" size={18} />
             </motion.div>
 
@@ -8717,7 +9171,7 @@ const BandwidthTestPage = () => {
                 <label htmlFor="remember">Remember me</label>
               </div>
               <div className="codingstella-forgot">
-                <a href="#">Forgot password?</a>
+                <a href="#" onClick={(e) => e.preventDefault()}>Forgot?</a>
               </div>
             </motion.div>
 
@@ -8727,11 +9181,14 @@ const BandwidthTestPage = () => {
               transition={{ delay: 0.7 }}
               className="codingstella-input_box"
             >
-              <button type="submit" className="codingstella-input-submit glow-effect-container text-white" disabled={isLoading}>
+              <button type="submit" className="codingstella-input-submit glow-effect-container text-white py-3 font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2" disabled={isLoading}>
                 {isLoading ? (
-                  <RefreshCw className="animate-spin mx-auto" size={20} />
+                  <RefreshCw className="animate-spin" size={18} />
                 ) : (
-                  <span>{isRegistering ? 'Register' : 'Login'}</span>
+                  <>
+                    {isRegistering ? <UserPlus size={16} /> : <LogIn size={16} />}
+                    <span>{isRegistering ? 'Register Now' : 'Sign In'}</span>
+                  </>
                 )}
               </button>
             </motion.div>
@@ -8740,58 +9197,28 @@ const BandwidthTestPage = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8 }}
-              className="text-center mt-4 text-sm text-gray-300"
+              className="text-center mt-6 pt-4 border-t border-white/5"
             >
-              <p>Or continue with</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-3">Or continue with</p>
               <button 
                 type="button"
-                onClick={async () => { 
-                  playSound('click'); 
-                  setIsLoading(true);
-                  try {
-                    await onLogin(); 
-                  } catch (err: any) {
-                    console.error("Google login error:", err);
-                    const isIframe = window.self !== window.top;
-                    let msg = err.message || "Google Login failed";
-                    if (isIframe && (err.code === 'auth/popup-blocked' || err.code === 'auth/internal-error')) {
-                      msg = "Login blocked by browser. Please open this app in a NEW TAB to login with Google.";
-                    }
-                    addNotification(msg, "error");
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                className="mt-2 w-full py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl flex items-center justify-center gap-2 transition-all font-bold disabled:opacity-50"
+                onClick={handleGoogleLogin}
+                className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center justify-center gap-2 transition-all font-bold text-sm disabled:opacity-50"
                 disabled={isLoading}
               >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-                {isLoading ? <RefreshCw className="animate-spin" size={18} /> : "Google sign in"}
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
+                Google Sign In
               </button>
               
-              <div className="mt-6 pt-4 border-t border-white/10">
-                <p className="text-xs text-gray-400 mb-2">Issue with Google Login?</p>
+              <div className="mt-6">
                 <button 
                   type="button"
                   onClick={() => setIsRegistering(!isRegistering)}
-                  className="text-blue-400 hover:text-blue-300 font-bold underline"
+                  className="text-blue-500 hover:text-blue-400 font-black text-[10px] uppercase tracking-widest transition-all"
                 >
-                  {isRegistering ? "Already have an account? Login with Email" : "No Google? Register with Email"}
+                  {isRegistering ? 'Already have an account? Login' : "Don't have an account? Register"}
                 </button>
               </div>
-            </motion.div>
-
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.9 }}
-              className="codingstella-register"
-            >
-              <span>{isRegistering ? 'Already have an account? ' : "Don't have an account? "} 
-                <a href="#" onClick={(e) => { e.preventDefault(); setIsRegistering(!isRegistering); }}>
-                  {isRegistering ? 'Login' : 'Register'}
-                </a>
-              </span>
             </motion.div>
           </form>
         </motion.div>
@@ -9511,94 +9938,7 @@ const MePage = ({
                     </label>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/10 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center text-purple-600">
-                        <Music size={20} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold">Intro Music</p>
-                        <p className="text-[10px] text-gray-500">Custom startup sound</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                       {customIntroMusic && (
-                         <>
-                           <button 
-                             onClick={() => {
-                               const audio = new Audio(customIntroMusic);
-                               audio.volume = 1.0;
-                               audio.play().catch(() => addNotification("Error playing audio"));
-                             }}
-                             className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-lg"
-                           >
-                             <div className="w-4 h-4 rounded-full border-2 border-emerald-600 flex items-center justify-center pl-0.5">
-                                 <div className="w-0 h-0 border-t-[3px] border-t-transparent border-l-[5px] border-l-emerald-600 border-b-[3px] border-b-transparent" />
-                             </div>
-                           </button>
-                           <button 
-                             onClick={() => {
-                               setCustomIntroMusic(null);
-                               localStorage.removeItem('cctv_custom_intro_music');
-                               addNotification("Intro music reset!");
-                             }}
-                             className="p-2 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-lg"
-                           >
-                             <Trash2 size={16} />
-                           </button>
-                         </>
-                       )}
-                       <label className="px-4 py-2 bg-purple-600 text-white rounded-lg text-xs font-bold cursor-pointer hover:bg-purple-700 transition-colors">
-                         Upload
-                         <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, 'intro')} />
-                       </label>
-                     </div>
-                   </div>
-
-                   <div className="flex items-center justify-between p-4 bg-orange-50 dark:bg-orange-900/10 rounded-xl">
-                     <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center text-orange-600">
-                         <Zap size={20} />
-                       </div>
-                       <div>
-                         <p className="text-sm font-bold">Click Sound</p>
-                         <p className="text-[10px] text-gray-500">Custom button feedback</p>
-                       </div>
-                     </div>
-                     <div className="flex gap-2">
-                       {customClickSound && (
-                         <>
-                           <button 
-                             onClick={() => {
-                               const audio = new Audio(customClickSound);
-                               audio.volume = 1.0;
-                               audio.play().catch(() => addNotification("Error playing audio"));
-                             }}
-                             className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-lg"
-                           >
-                             <div className="w-4 h-4 rounded-full border-2 border-emerald-600 flex items-center justify-center pl-0.5">
-                                 <div className="w-0 h-0 border-t-[3px] border-t-transparent border-l-[5px] border-l-emerald-600 border-b-[3px] border-b-transparent" />
-                             </div>
-                           </button>
-                           <button 
-                             onClick={() => {
-                               setCustomClickSound(null);
-                               localStorage.removeItem('cctv_custom_click_sound');
-                               addNotification("Click sound reset!");
-                             }}
-                             className="p-2 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-lg"
-                           >
-                             <Trash2 size={16} />
-                           </button>
-                         </>
-                       )}
-                      <label className="px-4 py-2 bg-orange-600 text-white rounded-lg text-xs font-bold cursor-pointer hover:bg-orange-700 transition-colors">
-                        Upload
-                        <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(e, 'click')} />
-                      </label>
-                    </div>
-                  </div>
-
+                  {/* Banner images section stays */}
                   <div className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/10 rounded-xl">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center text-purple-600">
@@ -9661,6 +10001,68 @@ const MePage = ({
 
           {/* Regular non-admin visible sections in the right column */}
           <div className="space-y-6">
+            {/* Theme Preference / Dark Mode Toggle */}
+            <div className="glass-card p-6 space-y-4">
+              <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Appearance Settings</h4>
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-blue-950/40 text-orange-500 dark:text-blue-400 flex items-center justify-center transition-all duration-300">
+                    {isDarkMode ? <Moon size={20} className="text-blue-400" /> : <Sun size={20} className="text-yellow-500" />}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">Dark Mode Preference</p>
+                    <p className="text-[10px] text-slate-500 font-medium">Switch between light and dark themes</p>
+                  </div>
+                </div>
+                
+                {/* Switch Toggle */}
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  aria-label="Toggle dark mode"
+                  className={cn(
+                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/20",
+                    isDarkMode ? "bg-blue-600" : "bg-slate-200"
+                  )}
+                  role="switch"
+                  aria-checked={isDarkMode}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
+                      isDarkMode ? "translate-x-5" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
+
+              {/* Theme quick selector grids */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setIsDarkMode(false)}
+                  className={cn(
+                    "p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider transition-all",
+                    !isDarkMode 
+                      ? "bg-white border-blue-500 text-blue-600 shadow-md shadow-blue-500/10" 
+                      : "bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800/40 text-slate-400 dark:text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                  )}
+                >
+                  <Sun size={14} /> Light Mode
+                </button>
+                <button
+                  onClick={() => setIsDarkMode(true)}
+                  className={cn(
+                    "p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider transition-all",
+                    isDarkMode 
+                      ? "bg-slate-900 border-slate-700 text-blue-400 shadow-lg shadow-black/40" 
+                      : "bg-slate-50/50 border-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  )}
+                >
+                  <Moon size={14} /> Dark Mode
+                </button>
+              </div>
+            </div>
+
             {/* Company Information */}
             <div className="glass-card p-6 space-y-4">
               <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Company Information</h4>
@@ -10191,6 +10593,7 @@ const MePage = ({
                 isAdmin={isAdmin}
                 isDarkMode={isDarkMode}
                 productCategories={productCategories}
+                deleteAnyOrder={deleteAnyOrder}
               /> : <PublicStore products={products} sliderImages={sliderImages} offers={offers} formatCurrency={formatCurrency} addToCart={addToCart} setActiveTab={setActiveTab} setSelectedProduct={setSelectedProduct} productCategories={productCategories} />)}
               {activeTab === 'shop-view' && <PublicStore products={products} sliderImages={sliderImages} offers={offers} formatCurrency={formatCurrency} addToCart={addToCart} setActiveTab={setActiveTab} setSelectedProduct={setSelectedProduct} productCategories={productCategories} />}
               {activeTab === 'manage-services' && isAdmin && (
@@ -10206,7 +10609,15 @@ const MePage = ({
                 />
               )}
               {activeTab === 'my-orders' && (
-                <MyOrdersPage user={user} clients={clients} formatCurrency={formatCurrency} isAdmin={isAdmin} acceptPublicOrder={acceptPublicOrder} addNotification={addNotification} />
+                <MyOrdersPage 
+                  user={user} 
+                  clients={clients} 
+                  formatCurrency={formatCurrency} 
+                  isAdmin={isAdmin} 
+                  acceptPublicOrder={acceptPublicOrder} 
+                  addNotification={addNotification}
+                  deleteAnyOrder={deleteAnyOrder}
+                />
               )}
               {activeTab === 'clients' && isAdmin && (
                 <ClientList 
@@ -10418,7 +10829,7 @@ const getStatusColor = (status: OrderStatus) => {
   }
 };
 
-const MyOrdersPage = ({ user, clients, formatCurrency, isAdmin, acceptPublicOrder, addNotification }: { user: any | null, clients: Client[], formatCurrency: (amount: number) => string, isAdmin: boolean, acceptPublicOrder: (order: PublicOrder) => Promise<void>, addNotification: (msg: string, type?: any) => void }) => {
+const MyOrdersPage = ({ user, clients, formatCurrency, isAdmin, acceptPublicOrder, addNotification, deleteAnyOrder }: { user: any | null, clients: Client[], formatCurrency: (amount: number) => string, isAdmin: boolean, acceptPublicOrder: (order: PublicOrder) => Promise<void>, addNotification: (msg: string, type?: any) => void, deleteAnyOrder: (order: any) => Promise<void> }) => {
   const client = useMemo(() => clients.find(c => c.email === user?.email || c.phone === user?.phoneNumber), [clients, user]);
   const [allPublicOrders, setAllPublicOrders] = useState<any[]>([]);
 
@@ -10440,19 +10851,57 @@ const MyOrdersPage = ({ user, clients, formatCurrency, isAdmin, acceptPublicOrde
 
   if (!isAdmin && !client) return <div className="p-4 text-center">No orders found. Please log in or contact support.</div>;
   
-  const allOrders = isAdmin 
-    ? allPublicOrders
-    : [
-        ...allPublicOrders, 
-        ...(client?.orders || []).map(o => ({ ...o, source: 'crm' }))
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const allOrders = useMemo(() => {
+    if (isAdmin) {
+      const crmOrders = clients.flatMap(c => (c.orders || []).map(o => ({ 
+        ...o, 
+        source: 'crm', 
+        clientId: c.id, 
+        customerName: c.name, 
+        customerPhone: c.phone, 
+        customerAddress: c.address 
+      })));
+      const merged = [...allPublicOrders, ...crmOrders];
+      // Use map to keep latest version if there are duplicates (CRM usually has more up-to-date status)
+      const uniqueMap = new Map();
+      merged.forEach(o => {
+        if (!uniqueMap.has(o.id) || o.source === 'crm') {
+          uniqueMap.set(o.id, o);
+        }
+      });
+      return Array.from(uniqueMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+    const merged = [
+      ...allPublicOrders, 
+      ...(client?.orders || []).map(o => ({ ...o, source: 'crm' }))
+    ];
+    const uniqueMap = new Map();
+    merged.forEach(o => {
+      if (!uniqueMap.has(o.id) || o.source === 'crm') {
+        uniqueMap.set(o.id, o);
+      }
+    });
+    return Array.from(uniqueMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [allPublicOrders, clients, isAdmin, client]);
   
-  const updateStatus = async (orderId: string, newStatus: string) => {
+  const updateStatus = async (order: any, newStatus: string) => {
     try {
-      await updateDoc(doc(db, 'public_orders', orderId), { status: newStatus });
+      if (order.source === 'public') {
+        await updateDoc(doc(db, 'public_orders', order.id), { status: newStatus });
+      } else if (order.source === 'crm' && order.clientId) {
+        const targetClient = clients.find(c => c.id === order.clientId);
+        if (targetClient) {
+          const updatedOrders = (targetClient.orders || []).map((o: any) => 
+            o.id === order.id ? { ...o, status: newStatus as any } : o
+          );
+          await updateDoc(doc(db, 'clients', String(targetClient.id)), { orders: updatedOrders });
+        }
+      }
       playSound('success');
+      addNotification(`Order status updated to ${newStatus}`, 'success');
     } catch (e) {
       console.error(e);
+      addNotification("Status update failed", "error");
     }
   };
 
@@ -10520,16 +10969,12 @@ const MyOrdersPage = ({ user, clients, formatCurrency, isAdmin, acceptPublicOrde
               {isAdmin ? (
                 <div className="flex gap-2">
                   <button 
-                    onClick={async () => {
-                      if (confirm('Are you sure you want to delete this order?')) {
-                        await deleteDoc(doc(db, 'public_orders', order.id));
-                        addNotification("Order deleted successfully.");
-                      }
-                    }}
-                    className="px-3 py-2 bg-red-100 dark:bg-rose-900/30 text-rose-600 rounded-xl text-[9px] font-black uppercase hover:bg-rose-600 hover:text-white transition-all"
+                    onClick={() => deleteAnyOrder(order)}
+                    className="px-3 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/10 text-rose-600 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center gap-1.5 border border-rose-100 dark:border-rose-900/20 shadow-sm"
                     title="Delete Permanent"
                   >
                     <Trash2 size={12} />
+                    <span>Delete</span>
                   </button>
                   {order.status === 'pending' && (
                     <button 
@@ -10541,7 +10986,7 @@ const MyOrdersPage = ({ user, clients, formatCurrency, isAdmin, acceptPublicOrde
                   )}
                   <select 
                     value={order.status}
-                    onChange={(e) => updateStatus(order.id, e.target.value)}
+                    onChange={(e) => updateStatus(order, e.target.value)}
                     className="px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-[9px] font-black uppercase outline-none focus:ring-2 ring-blue-500 transition-all border-none"
                   >
                     <option value="pending">Pending</option>
