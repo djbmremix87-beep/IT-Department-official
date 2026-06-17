@@ -3,6 +3,8 @@ import Fuse from 'fuse.js';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
+  Code,
+  Copy,
   LayoutDashboard, 
   Users, 
   Package, 
@@ -9254,6 +9256,446 @@ const BandwidthTestPage = () => {
   };
 
 
+const SourceCodeExplorerModal = ({ onClose }: { onClose: () => void }) => {
+  const [files, setFiles] = useState<string[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string>('');
+  const [fileContent, setFileContent] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [copied, setCopied] = useState<boolean>(false);
+  const [copyAllStatus, setCopyAllStatus] = useState<'idle' | 'loading' | 'copied' | 'error'>('idle');
+  const [copyPortableHtmlStatus, setCopyPortableHtmlStatus] = useState<'idle' | 'loading' | 'copied' | 'error'>('idle');
+  const [manualCopyTitle, setManualCopyTitle] = useState<string>('');
+  const [modalFallbackText, setModalFallbackText] = useState<string>('');
+  const [syncCopied, setSyncCopied] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetch('/api/source-code/list')
+      .then(res => res.json())
+      .then(data => {
+        if (data.files && data.files.length > 0) {
+          setFiles(data.files);
+          setSelectedFile(data.files[0]);
+        }
+      })
+      .catch(err => console.error('Error fetching file list', err));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedFile) return;
+    setLoading(true);
+    setFileContent('');
+    fetch(`/api/source-code/file?path=${encodeURIComponent(selectedFile)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.content) {
+          setFileContent(data.content);
+        } else {
+          setFileContent('Error loading file: ' + (data.error || 'Unknown error'));
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        setFileContent('Failed to load file content.');
+        setLoading(false);
+      });
+  }, [selectedFile]);
+
+  const handleSyncCopy = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(modalFallbackText);
+        setSyncCopied(true);
+        setTimeout(() => setSyncCopied(false), 2500);
+        return;
+      }
+    } catch (e) {
+      console.warn("navigator.clipboard sync copy failed, trying execCommand", e);
+    }
+
+    try {
+      const el = document.createElement('textarea');
+      el.value = modalFallbackText;
+      el.setAttribute('readonly', '');
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      el.style.top = '0';
+      el.style.left = '0';
+      document.body.appendChild(el);
+      el.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(el);
+      if (success) {
+        setSyncCopied(true);
+        setTimeout(() => setSyncCopied(false), 2500);
+      }
+    } catch (e) {
+      console.error("execCommand fallback copy failed synchronously:", e);
+    }
+  };
+
+  const attemptCopy = async (text: string, titleForFallback: string): Promise<boolean> => {
+    // 1. First try modern clipboard API directly (works if focused or not nested deeply in sandboxes)
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      console.warn("navigator.clipboard failed, using legacy", e);
+    }
+
+    // 2. Try legacy select and copy
+    try {
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.setAttribute('readonly', '');
+      el.style.position = 'absolute';
+      el.style.left = '-9999px';
+      document.body.appendChild(el);
+      el.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(el);
+      if (success) return true;
+    } catch (e) {
+      console.error("execCommand copy failed:", e);
+    }
+
+    // 3. Fallback to user-activated secure popup
+    setManualCopyTitle(titleForFallback);
+    setModalFallbackText(text);
+    return false;
+  };
+
+  const handleCopy = async () => {
+    const success = await attemptCopy(fileContent, `${selectedFile.split('/').pop()} ফাইল কোড (FILE CODE)`);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopyAllCombined = async () => {
+    try {
+      setCopyAllStatus('loading');
+      const res = await fetch('/api/source-code/all-combined');
+      const data = await res.json();
+      if (data.combined) {
+        const success = await attemptCopy(data.combined, 'সব অবিকল সোর্স ফাইল কোড (ALL SOURCE FILES)');
+        if (success) {
+          setCopyAllStatus('copied');
+          setTimeout(() => setCopyAllStatus('idle'), 3000);
+        } else {
+          setCopyAllStatus('idle');
+        }
+      } else {
+        throw new Error(data.error || 'No content');
+      }
+    } catch (err) {
+      console.error('All copy failed', err);
+      // Let's fallback directly
+      setCopyAllStatus('error');
+      setTimeout(() => setCopyAllStatus('idle'), 3000);
+    }
+  };
+
+  const handleCopyPortableHtml = async () => {
+    try {
+      setCopyPortableHtmlStatus('loading');
+      const res = await fetch('/api/source-code/portable-html-text');
+      const data = await res.json();
+      if (data.html) {
+        const success = await attemptCopy(data.html, 'CRM Portable Standalone HTML Source');
+        if (success) {
+          setCopyPortableHtmlStatus('copied');
+          setTimeout(() => setCopyPortableHtmlStatus('idle'), 3000);
+        } else {
+          setCopyPortableHtmlStatus('idle');
+        }
+      } else {
+        throw new Error(data.error || 'No content');
+      }
+    } catch (err) {
+      console.error('Portable HTML copy failed', err);
+      setCopyPortableHtmlStatus('error');
+      setTimeout(() => setCopyPortableHtmlStatus('idle'), 3000);
+    }
+  };
+
+  const filteredContent = useMemo(() => {
+    if (!searchQuery) return fileContent;
+    const lines = fileContent.split('\n');
+    return lines
+      .map((line, idx) => ({ line, num: idx + 1 }))
+      .filter(item => item.line.toLowerCase().includes(searchQuery.toLowerCase()))
+      .map(item => `L${item.num}: ${item.line}`)
+      .join('\n') || '// No lines match search query';
+  }, [fileContent, searchQuery]);
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 shadow-2xl" onClick={onClose}>
+      <div 
+        className="w-full max-w-5xl h-[85vh] bg-white dark:bg-slate-900 rounded-[32px] flex flex-col overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-6 border-b border-slate-150 dark:border-slate-800/80 flex flex-col xl:flex-row gap-4 justify-between xl:items-center bg-slate-50 dark:bg-slate-900/50">
+          <div>
+            <h3 className="text-sm font-black text-slate-150 dark:text-white uppercase tracking-tight flex items-center gap-2">
+              <Code size={18} className="text-red-600 animate-pulse" /> Complete System Code Explorer
+            </h3>
+            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">
+              Read, copy, search or download any part of the website source code
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Copy Combined Code Button */}
+            <button
+              onClick={handleCopyAllCombined}
+              disabled={copyAllStatus === 'loading'}
+              className={`px-3 py-2 text-[9px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1 cursor-pointer ${
+                copyAllStatus === 'copied'
+                  ? 'bg-emerald-600 text-white animate-bounce'
+                  : copyAllStatus === 'loading'
+                  ? 'bg-amber-500 text-white animate-pulse cursor-wait'
+                  : copyAllStatus === 'error'
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-slate-800 hover:bg-slate-700 text-white'
+              }`}
+            >
+              {copyAllStatus === 'copied' ? (
+                <>
+                  <Check size={11} /> সব অবিকল সোর্স কোড কপি সম্পন্ন!
+                </>
+              ) : copyAllStatus === 'loading' ? (
+                'কপি হচ্ছে...'
+              ) : (
+                <>
+                  <Copy size={11} /> Raw কোড কপি করুন (COPY SOURCES)
+                </>
+              )}
+            </button>
+
+            {/* Copy Portable HTML Button */}
+            <button
+              onClick={handleCopyPortableHtml}
+              disabled={copyPortableHtmlStatus === 'loading'}
+              className={`px-3 py-2 text-[9px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1 cursor-pointer ${
+                copyPortableHtmlStatus === 'copied'
+                  ? 'bg-emerald-600 text-white animate-bounce'
+                  : copyPortableHtmlStatus === 'loading'
+                  ? 'bg-amber-500 text-white animate-pulse cursor-wait'
+                  : copyPortableHtmlStatus === 'error'
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              {copyPortableHtmlStatus === 'copied' ? (
+                <>
+                  <Check size={11} /> HTML কোড কপি সম্পন্ন! (পদ্ধতি: Copy HTML)
+                </>
+              ) : copyPortableHtmlStatus === 'loading' ? (
+                'রেন্ডারিং হচ্ছে...'
+              ) : (
+                <>
+                  <Copy size={11} /> ১ ক্লিকে HTML কোড কপি (COPY PORTABLE HTML)
+                </>
+              )}
+            </button>
+
+            {/* Direct HTML File Download */}
+            <a
+              href="/api/source-code/download-portable-html"
+              className="px-3 py-2 text-[9px] bg-[#bf0528] hover:bg-red-800 text-white font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1 cursor-pointer"
+            >
+              <Download size={11} /> HTML ফাইল ডাউনলোড (DOWNLOAD HTML)
+            </a>
+
+            <button 
+              onClick={onClose}
+              className="p-1.5 hover:bg-slate-200/50 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500 dark:text-gray-400"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Content Panel */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          {/* Sidebar file list */}
+          <div className="w-full md:w-56 border-r border-slate-100 dark:border-slate-800/80 p-4 overflow-y-auto space-y-1 bg-slate-50/50 dark:bg-slate-950/25 shrink-0">
+            <span className="text-[9px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest block px-2 mb-2">Workspace Files</span>
+            {files.map(file => (
+              <button
+                key={file}
+                onClick={() => setSelectedFile(file)}
+                className={`w-full text-left p-2 rounded-xl text-xs font-semibold tracking-wide transition-all truncate flex items-center gap-2 ${
+                  selectedFile === file 
+                    ? "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 shadow-sm font-black" 
+                    : "text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-slate-800/50"
+                }`}
+              >
+                <div className={`w-1.5 h-1.5 rounded-full ${selectedFile === file ? "bg-red-500 shadow-md" : "bg-slate-400 dark:bg-slate-600"}`}></div>
+                {file.split('/').pop()}
+                <span className="text-[8px] text-slate-400 font-normal ml-auto opacity-75">{file.includes('/') ? `/${file.split('/')[0]}` : ''}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Code Viewer Area */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-slate-950 text-slate-300">
+            {/* Toolbar */}
+            <div className="p-3 border-b border-slate-800/80 bg-slate-900/60 flex flex-wrap gap-2 items-center justify-between">
+              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                <Search size={14} className="text-slate-500 ml-2" />
+                <input 
+                  type="text"
+                  placeholder="Search code line/keyword..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="bg-transparent border-none text-xs text-white focus:outline-none w-full placeholder-slate-600 font-semibold"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="text-slate-500 hover:text-white text-xs px-2 font-black uppercase">Clear</button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopy}
+                  disabled={loading}
+                  className="px-3 py-1.5 bg-slate-850 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="text-emerald-500 font-black animate-bounce" size={12} /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={11} /> Copy to Clipboard
+                    </>
+                  )}
+                </button>
+                <a
+                  href="/api/source-code/download-zip"
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md shadow-red-950/25 cursor-pointer"
+                >
+                  <Download size={11} /> Download ZIP
+                </a>
+                <a
+                  href="/api/source-code/download-portable-html"
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md shadow-indigo-950/25 cursor-pointer"
+                >
+                  <Download size={11} /> Standalone HTML
+                </a>
+              </div>
+            </div>
+
+            {/* Code view pane */}
+            <div className="flex-1 overflow-auto font-mono text-xs p-4 leading-relaxed bg-slate-950/95 select-text selection:bg-red-900/30 selection:text-white">
+              {loading ? (
+                <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-500">
+                  <div className="w-5 h-5 border-2 border-red-500/20 border-t-red-500 rounded-full animate-spin"></div>
+                  <span className="text-[10px] uppercase font-black tracking-widest mt-2 animate-pulse">Fetching safe content...</span>
+                </div>
+              ) : (
+                <pre className="whitespace-pre overflow-x-auto select-text scrollbar-thin">
+                  <code>{filteredContent}</code>
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-slate-100 dark:bg-slate-900 border-t border-slate-150 dark:border-slate-800/80 text-center text-[9px] font-black text-gray-500 uppercase tracking-widest flex items-center justify-between px-6">
+          <span>Path: <strong className="text-slate-700 dark:text-gray-300">{selectedFile || "None"}</strong></span>
+          <span className="text-slate-400">Lines Count: {fileContent.split('\n').length} lines</span>
+        </div>
+      </div>
+
+      {/* Manual Copy Fallback Dialog */}
+      {modalFallbackText && (
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[110] flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-4 shadow-2xl">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] font-black text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  নিরাপত্তা জনিত কারণে ম্যানুয়াল কপি প্রয়োজন (Manual Action Required)
+                </span>
+                <h4 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight mt-2">
+                  {manualCopyTitle}
+                </h4>
+              </div>
+              <button 
+                onClick={() => { setModalFallbackText(''); setSyncCopied(false); }}
+                className="p-1 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 rounded-lg text-xs font-bold text-slate-500 dark:text-gray-300"
+              >
+                বন্ধ করুন (CLOSE)
+              </button>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/50 rounded-2xl p-4 space-y-2">
+              <p className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed font-bold">
+                💡 আইফ্রেম প্রোটেকশন বা ব্রাউজার সিকিউরিটির জন্য কপি করতে না পারলে - নিচে দেওয়া যেকোনো ১-ক্লিক অপশন ব্যবহার করুন:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                <button
+                  onClick={handleSyncCopy}
+                  className={`px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider text-center flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                    syncCopied 
+                      ? 'bg-emerald-600 text-white animate-bounce shadow-md' 
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
+                  }`}
+                >
+                  {syncCopied ? (
+                    <>
+                      <Check size={14} className="font-extrabold animate-pulse" /> কপি সফল হয়েছে! (COPIED)
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={13} /> 📋 ১-ক্লিকে কপি করুন (COPY NOW)
+                    </>
+                  )}
+                </button>
+                <a
+                  href="/api/source-code/download-portable-html"
+                  className="px-4 py-3 bg-[#bf0528] hover:bg-red-850 text-white rounded-xl text-xs font-black uppercase tracking-wider text-center flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md"
+                >
+                  <Download size={13} /> 📥 HTML ফাইল ডাউনলোড (DOWNLOAD FILE)
+                </a>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-gray-400 leading-relaxed font-semibold">
+              অথবা নিচের বাক্সে একটি ক্লিক করুন (সব কোড অটো-সিলেক্ট হবে), তারপর কিবোর্ড এর <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-850 dark:text-gray-200 border border-slate-200 dark:border-slate-800 rounded font-bold text-[10px]">Ctrl + A</kbd> ও <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-850 dark:text-gray-200 border border-slate-200 dark:border-slate-800 rounded font-bold text-[10px]">Ctrl + C</kbd> চেপে কপি করে নিন।
+            </p>
+
+            <textarea
+              readOnly
+              value={modalFallbackText}
+              onFocus={e => e.target.select()}
+              onClick={e => (e.target as HTMLTextAreaElement).select()}
+              className="w-full flex-1 min-h-[200px] h-48 p-4 text-xs font-mono bg-slate-950 text-emerald-400 border border-slate-850 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500 resize-none select-all selection:bg-rose-950/50"
+              placeholder="কোড প্রস্তুত হচ্ছে..."
+            />
+
+            <div className="flex gap-3 justify-end items-center">
+              <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mr-auto">
+                {modalFallbackText.length} characters | {(modalFallbackText.length / 1024).toFixed(1)} KB
+              </span>
+              <button 
+                onClick={() => { setModalFallbackText(''); setSyncCopied(false); }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase cursor-pointer"
+              >
+                ঠিক আছে (DONE)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 
 const MePage = ({ 
@@ -9312,6 +9754,7 @@ const MePage = ({
     });
     const [showEditRules, setShowEditRules] = useState(false);
     const [showChangePassword, setShowChangePassword] = useState(false);
+    const [showCodeExplorer, setShowCodeExplorer] = useState(false);
     const [oldPass, setOldPass] = useState('');
     const [newPass, setNewPass] = useState('');
     const [confirmPass, setConfirmPass] = useState('');
@@ -10165,6 +10608,12 @@ const MePage = ({
                     >
                       <RefreshCcw size={16} /> Backup
                     </button>
+                    <button 
+                      onClick={() => withPassword(() => setShowCodeExplorer(true))}
+                      className="p-3 bg-blue-50 hover:bg-blue-100 dark:bg-slate-800/80 hover:dark:bg-slate-800 text-blue-600 dark:text-blue-400 rounded-xl flex items-center gap-2 text-xs font-bold col-span-2 justify-center border border-blue-100/50 dark:border-slate-700/50 transition-colors shadow-sm"
+                    >
+                      <Code size={16} /> View & Export Source Code
+                    </button>
                   </div>
                 </div>
 
@@ -10191,6 +10640,8 @@ const MePage = ({
                 </div>
               </div>
             )}
+
+            {showCodeExplorer && <SourceCodeExplorerModal onClose={() => setShowCodeExplorer(false)} />}
           </div>
         </div>
       );
