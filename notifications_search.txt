@@ -1,0 +1,2 @@
+6125:  const [notifications, setNotifications] = useState<{id: number, text: string, type?: 'info' | 'success' | 'admin-order' | 'error', order?: PublicOrder}[]>([]);
+11222:          {notifications.map(n => (

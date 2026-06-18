@@ -1,0 +1,148 @@
+const OffersPage = ({ isAdmin, offers, user, addNotification, withPassword }: { isAdmin: boolean, offers: Offer[], user: FirebaseUser | null, addNotification: (text: string) => void, withPassword: (action: () => void, strict?: boolean) => void }) => {
+        addNotification('File is too large. Please select an image under 20MB.');
+      addNotification("Uploading image...");
+        addNotification("Image uploaded successfully!");
+        addNotification("Image upload failed: " + (error.message || "Unknown error"));
+      addNotification("অফার পাবলিশ করা হয়েছে!");
+      addNotification("লাইক দিতে লগইন করুন!");
+      addNotification("কমেন্ট করতে লগইন করুন!");
+        addNotification("লিঙ্ক কপি করা হয়েছে!");
+        addNotification("অফার মুছে ফেলা হয়েছে!");
+  addNotification,
+  addNotification: (msg: string) => void,
+                  addNotification(`${product.name} added to cart!`);
+  addNotification 
+  addNotification: (msg: string) => void
+      addNotification(`Cannot delete: ${linkedProducts.length} products are still in this category.`);
+    addNotification("Category deleted successfully.");
+      addNotification("Please enter a category name.");
+      addNotification("This category already exists.");
+    addNotification(`Category "${newCat}" added successfully!`);
+      addNotification("Name cannot be empty.");
+    addNotification("Category updated successfully.");
+const ManageStaff = ({ withPassword, addNotification }: { withPassword: (action: () => void) => void, addNotification: (text: string) => void }) => {
+        addNotification("Please enter a valid base amount.");
+      addNotification(`Salary of BDT ${total} paid to ${showSalaryModal.name}!`);
+  addNotification
+  addNotification: (msg: string) => void
+              addNotification("Product successfully created!");
+  addNotification
+  addNotification: (msg: string) => void
+              addNotification("Product successfully updated!");
+                setTimeout(() => addNotification(`🎉 Salary Paid: BDT ${latestSalary.totalPaid} for ${latestSalary.monthName}.`), 2000);
+            setTimeout(() => addNotification(`⚠️ Reminder: Salary is pending for ${unpaidStaff} staff member(s)!`), 5000);
+        addNotification(`${latestOrder.customerName} has placed a new order of BDT ${latestOrder.total}`, 'admin-order', latestOrder);
+      addNotification("Only the owner can perform this action. Please log in.");
+    addNotification("Admin session locked.");
+          addNotification(`Reminder: You have a pending bill of ${formatCurrency(clientData.due)}. Please pay to avoid service interruption.`);
+        addNotification(`You have ${pendingCount} new order(s) waiting for confirmation!`, 'admin-order');
+        addNotification("Logo file too large! Max 10MB.");
+      addNotification("Uploading logo...");
+        addNotification("Logo updated successfully!");
+        addNotification("Logo upload failed: " + (error.message || "Unknown error"));
+      addNotification("Please login to upload logo.");
+  const addNotification = (text: string, type: 'info' | 'success' | 'admin-order' | 'error' = 'info', order?: PublicOrder) => {
+      addNotification("Please login to add work.");
+      addNotification("Work added successfully!");
+      addNotification("Please login to record payment.");
+      addNotification("Payment recorded successfully!");
+      addNotification("Please login to delete payment.");
+      addNotification("Payment deleted!");
+      addNotification("Please login to delete work.");
+      addNotification("Work deleted!");
+      addNotification("Please login to update status.");
+      addNotification(`Order status updated to ${newStatus}`);
+      addNotification("Failed to update status.");
+      addNotification("Please login to delete order.");
+      addNotification("Order deleted successfully!", "success");
+      addNotification("Delete failed: " + (error.message || error), "error");
+       addNotification("Admin access required.");
+      addNotification("Order deleted from all records successfully.", "success");
+      addNotification("Delete failed: " + (err.message || err), "error");
+      addNotification("Out of stock!");
+    addNotification(`${product.name} added to cart`);
+    addNotification("Item removed from cart");
+      addNotification(isPaid ? `Order placed and paid via ${paymentType}!` : "Order placed successfully! We will contact you soon.");
+        addNotification(`Updated profile for ${order.customerName}`, 'success');
+        addNotification(`New client added: ${order.customerName}`, 'success');
+      addNotification(`Order from ${order.customerName} accepted!`);
+      addNotification("Failed to accept order.");
+      addNotification(isPaid ? "Order placed & Payment recorded!" : "Order placed successfully!");
+        addNotification(error.message);
+    addNotification("Starting data migration...");
+      addNotification(`Migration complete! ${productCount} products, ${clientCount} clients, ${expenseCount} expenses moved.`);
+      addNotification("Migration failed. Check console for details.");
+    addNotification("Inventory PDF downloaded!");
+        addNotification("Data synchronized with cloud!");
+    addNotification("Product added!");
+      addNotification("Saved locally! Login to sync to cloud.");
+      addNotification("Product successfully synced to cloud!", "success");
+      addNotification(`Cloud Sync Error: ${errorMsg}`, "error");
+    addNotification("Product deleted!");
+    addNotification("Product updated!");
+      addNotification("Changes saved to cloud!", "success");
+      addNotification(`Update Error: ${errorMsg}`, "error");
+    addNotification(image ? "Profile picture updated!" : "Profile picture reset!");
+    addNotification("Warranty updated!");
+    addNotification("Installation date updated!");
+    addNotification("Client details updated!");
+    addNotification("Notes updated!");
+    addNotification("Client deleted!");
+    addNotification("Client added!");
+      addNotification("Client synced to cloud!");
+    addNotification("Expense added!");
+      addNotification("Saved locally! Login to sync to cloud.");
+      addNotification("Expense synced to cloud!");
+                        addNotification("Order rejected.");
+        addNotification(`Test Complete: DL ${finalDl.toFixed(1)} / UL ${finalUl.toFixed(1)} Mbps`);
+        addNotification("Test failed. Check connection.");
+          addNotification("Account created successfully!");
+          addNotification("Welcome back!");
+        addNotification(msg, "error");
+          addNotification("Google Login blocked. Please open this app in a NEW TAB to login securely.", "error");
+          addNotification("Login cancelled. Please don't close the popup window.", "info");
+          addNotification(err.message || "Google Login failed", "error");
+          addNotification("File too large! Max 10MB.", "error");
+        addNotification("Preparing logo for upload...");
+              addNotification("Uploading as optimized WebP...");
+              addNotification("Logo updated successfully!", "success");
+            addNotification("Uploading GIF logo...");
+            addNotification("GIF Logo uploaded successfully!", "success");
+          addNotification("Upload failed: " + (error.message || "Unknown error"), "error");
+          addNotification("Audio file too large! Max 1MB limit for smooth loading.");
+            addNotification("Audio format issue. Please try a different mp3.");
+            addNotification("Intro music updated! Playing preview...");
+            addNotification("Click sound updated! Playing preview...");
+          addNotification("File too large! Max 300MB.");
+              addNotification("Warning: Large files may fail to sync to cloud. Recommended < 1MB.");
+            addNotification("Offers background music updated!");
+        addNotification("Offers background music removed.");
+        addNotification("Old password incorrect!");
+        addNotification("Passwords do not match!");
+        addNotification("Password too short!");
+      addNotification("Password changed successfully!");
+        addNotification("Please login first!");
+      addNotification("Syncing local data...");
+          addNotification("Sync complete!");
+          addNotification("No local data found to sync.");
+        addNotification("Sync failed. Check console.");
+      addNotification("Public App link copied to clipboard!");
+                addNotification(`Payment of ${formatCurrency(clientData.due)} successful via ${type}!`);
+                            addNotification("Promo sliders cleared!");
+                              addNotification("Maximum 8 banner images allowed.");
+                            addNotification("Uploading banner...");
+                              addNotification("Banner image added successfully!");
+                              addNotification("Upload failed: " + error.message);
+      setTimeout(() => addNotification(`Synced ${newCats.length} missing categories found from products.`), 100);
+                  addNotification={addNotification}
+                  addNotification={addNotification}
+                  addNotification={addNotification}
+                <ManageStaff withPassword={withPassword} addNotification={addNotification} />
+                  onAction={() => addNotification("Initiating deep security scan... system is secure.")}
+                           addNotification("Order rejected.");
+        {selectedProduct && <ProductDetailsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} addToCart={addToCart} formatCurrency={formatCurrency} addNotification={addNotification} isAdmin={isAdmin && activeTab === 'products'} onEdit={(p) => { setSelectedProduct(null); withPassword(() => setShowEditProduct(p), true); }} onDelete={(id) => withPassword(() => handleDeleteProduct(id))} />}
+        {showAddProduct && <AddProductModal onClose={() => setShowAddProduct(false)} onAdd={handleAddProduct} productCategories={productCategories} setProductCategories={setProductCategories} addNotification={addNotification} />}
+        {showEditProduct && <EditProductModal product={showEditProduct} onClose={() => setShowEditProduct(null)} onSave={handleEditProduct} productCategories={productCategories} setProductCategories={setProductCategories} addNotification={addNotification} />}
+const MyOrdersPage = ({ user, clients, formatCurrency, isAdmin, acceptPublicOrder, addNotification, deleteAnyOrder }: { user: any | null, clients: Client[], formatCurrency: (amount: number) => string, isAdmin: boolean, acceptPublicOrder: (order: PublicOrder) => Promise<void>, addNotification: (msg: string, type?: any) => void, deleteAnyOrder: (order: any) => Promise<void> }) => {
+      addNotification(`Order status updated to ${newStatus}`, 'success');
+      addNotification("Status update failed", "error");

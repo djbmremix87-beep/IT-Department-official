@@ -1,5 +1,38 @@
-import React, { useState, useEffect, useMemo, Component, useRef } from 'react';
+import React, { useState, useEffect, useMemo, Component, useRef, useCallback } from 'react';
 import Fuse from 'fuse.js';
+import { 
+  collection, 
+  onSnapshot, 
+  addDoc,
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  query, 
+  orderBy,
+  where,
+  limit,
+  getDocs,
+  getDoc,
+  updateDoc,
+  serverTimestamp,
+  writeBatch
+} from 'firebase/firestore';
+import { 
+  onAuthStateChanged, 
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { 
+  auth, 
+  db, 
+  storage,
+  loginWithGoogle, 
+  loginWithEmail,
+  registerWithEmail,
+  logout, 
+  handleFirestoreError, 
+  OperationType 
+} from './firebase';
+
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -55,11 +88,11 @@ import {
   Sparkles,
   Send,
   CloudUpload,
+  Check,
   Info,
   Lock,
   Key,
   Edit2,
-  Check,
   Calendar,
   Image as ImageIcon,
   Music,
@@ -200,37 +233,6 @@ const DEFAULT_CLIENTS: Client[] = [
     notes: 'Requested additional outdoor bullet cam next month.'
   }
 ];
-
-import { 
-  onAuthStateChanged, 
-  User as FirebaseUser 
-} from 'firebase/auth';
-import { 
-  collection, 
-  onSnapshot, 
-  addDoc,
-  doc, 
-  setDoc, 
-  deleteDoc, 
-  query, 
-  orderBy,
-  where,
-  updateDoc,
-  getDoc,
-  getDocs,
-  writeBatch
-} from 'firebase/firestore';
-import { 
-  auth, 
-  db, 
-  storage,
-  loginWithGoogle, 
-  loginWithEmail,
-  registerWithEmail,
-  logout, 
-  handleFirestoreError, 
-  OperationType 
-} from './firebase';
 import { 
   ref, 
   uploadBytes, 
@@ -1019,9 +1021,9 @@ const OutageAlerts = ({ isAdmin }: { isAdmin: boolean }) => {
       </AnimatePresence>
 
       <div className="space-y-3">
-        {(isAdmin ? alerts : activeAlerts).map(alert => (
+        {(isAdmin ? alerts : activeAlerts).map((alert, idx) => (
           <motion.div
-            key={alert.id}
+            key={`${alert.id}-${idx}`}
             className={cn(
               "p-4 rounded-2xl border flex items-start gap-3 relative overflow-hidden",
               alert.type === 'critical' ? "bg-red-50 border-red-100 dark:bg-red-900/10 dark:border-red-900/30" :
@@ -1227,7 +1229,7 @@ const TrackOrderPage = ({ formatCurrency, clients }: { formatCurrency: (v: numbe
 
                 <div className="space-y-2 mt-2">
                   {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-sm">
+                    <div key={`${item.productId}-${idx}`} className="flex justify-between items-center text-sm">
                       <span className="text-gray-600 dark:text-gray-300">{item.name} <span className="text-gray-400">x{item.quantity}</span></span>
                       <span className="font-bold">{formatCurrency(item.price * item.quantity)}</span>
                     </div>
@@ -1508,11 +1510,11 @@ const OffersPage = ({ isAdmin, offers, user, addNotification, withPassword }: { 
             <p className="text-slate-500 font-medium">এখনও কোনো অফার পোস্ট করা হয়নি।</p>
           </div>
         ) : (
-          offers.map((offer) => {
+          offers.map((offer, idx) => {
             const isLiked = user && offer.likes?.includes(user.uid);
             return (
               <motion.div
-                key={offer.id}
+                key={`${offer.id}-${idx}`}
                 layout
                 className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden"
               >
@@ -1645,8 +1647,8 @@ const OffersPage = ({ isAdmin, offers, user, addNotification, withPassword }: { 
                           {offer.comments?.length === 0 ? (
                             <p className="text-center py-4 text-xs text-slate-400 italic">প্রথম কমেন্টটি আপনি করুন!</p>
                           ) : (
-                            offer.comments?.slice().reverse().map((comment) => (
-                              <div key={comment.id} className="flex gap-3">
+                            offer.comments?.slice().reverse().map((comment, cidx) => (
+                              <div key={`${comment.id}-${cidx}`} className="flex gap-3">
                                 <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 text-xs font-bold shrink-0 overflow-hidden">
                                   {comment.userPhoto ? <img src={comment.userPhoto} alt={comment.userName || 'User'} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (comment.userName ? comment.userName[0] : 'U')}
                                 </div>
@@ -1763,6 +1765,7 @@ const ProductDetailsModal = ({
   onDelete?: (id: string | number) => void
 }) => {
   const [showVideo, setShowVideo] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
   return (
     <motion.div 
@@ -1858,22 +1861,25 @@ const ProductDetailsModal = ({
 
             {/* Core Action buttons */}
             <div className="flex flex-col sm:flex-row gap-4 p-5 bg-slate-900/40 border border-slate-800/80 rounded-[24px]">
-              <button 
+              <motion.button 
+                whileTap={{ scale: 0.95 }}
                 onClick={() => {
+                  setIsAdding(true);
                   addToCart(product);
                   addNotification(`${product.name} added to cart!`);
+                  setTimeout(() => setIsAdding(false), 2000);
                 }}
-                disabled={product.stock <= 0}
+                disabled={product.stock <= 0 || isAdding}
                 className={cn(
-                  "flex-1 h-14 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg",
+                  "flex-1 h-14 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-lg",
                   product.stock > 0 
-                    ? "bg-blue-600 text-white hover:bg-blue-500 shadow-blue-500/10" 
+                    ? (isAdding ? "bg-emerald-600 text-white shadow-emerald-500/20" : "bg-blue-600 text-white hover:bg-blue-500 shadow-blue-500/10")
                     : "bg-slate-800 text-slate-500 cursor-not-allowed"
                 )}
               >
-                <ShoppingCart size={18} />
-                {product.stock > 0 ? 'Add to Cart' : 'Sold Out'}
-              </button>
+                {isAdding ? <Check size={18} /> : <ShoppingCart size={18} />}
+                {isAdding ? "Added!" : (product.stock > 0 ? 'Add to Cart' : 'Sold Out')}
+              </motion.button>
 
               <button 
                 onClick={() => {
@@ -2159,13 +2165,13 @@ const CategoryManager = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          {productCategories.map(cat => {
+          {productCategories.map((cat, idx) => {
             const productCount = products.filter(p => p.category === cat.name).length;
             const isEditing = editingCatId === cat.id;
 
             return (
               <div 
-                key={cat.id} 
+                key={`${cat.id}-${idx}`} 
                 className="p-2 bg-gray-50 dark:bg-slate-800/40 rounded-xl border border-gray-100 dark:border-slate-800 flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-black/5"
               >
                 <div className="w-8 h-8 rounded-lg overflow-hidden bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 flex-shrink-0 relative group/img">
@@ -2329,9 +2335,10 @@ const ProductList = ({
   // Find related categories based on search
   const suggestedCategories = useMemo(() => {
     if (!search) return [];
-    return productCategories.filter(cat => 
+    const matched = productCategories.filter(cat => 
       cat.name.toLowerCase().includes(search.toLowerCase()) && cat.name !== filter
     ).map(c => c.name);
+    return Array.from(new Set(matched));
   }, [search, productCategories, filter]);
 
   // Get all categories including custom ones
@@ -2456,11 +2463,11 @@ const ProductList = ({
         </div>
 
         <div className="flex gap-3 overflow-x-auto hide-scrollbar py-3 px-1">
-          {allCategories.map(cat => (
+          {allCategories.map((cat, idx) => (
             <motion.button 
               whileHover={{ y: -4, scale: 1.02 }}
               whileTap={{ scale: 0.95 }}
-              key={cat.id}
+              key={`${cat.id}-${idx}`}
               onClick={() => setFilter(cat.name)}
               className={cn(
                 "group relative min-w-[80px] h-20 rounded-[20px] overflow-hidden flex flex-col items-center justify-center gap-1 transition-all duration-500 ring-1 shadow-sm",
@@ -2505,9 +2512,9 @@ const ProductList = ({
           <div className="flex items-center gap-2 px-1">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Related:</span>
             <div className="flex gap-2 overflow-x-auto hide-scrollbar">
-              {suggestedCategories.map(cat => (
+              {suggestedCategories.map((cat, idx) => (
                 <button
-                  key={cat}
+                  key={`${cat}-${idx}`}
                   onClick={() => {
                     setFilter(cat);
                     setSearch('');
@@ -2534,7 +2541,7 @@ const ProductList = ({
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product, idx) => (
             <motion.div 
-              key={product.id}
+              key={`${product.id}-${idx}`}
               initial={{ opacity: 0, y: 30, scale: 0.8 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -2995,22 +3002,22 @@ const PublicStore = ({
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
               {sliderImages && sliderImages.length > 0 ? (
                 sliderImages.map((_, i) => (
-                  <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === currentSlide ? "bg-white w-4" : "bg-white/40")} />
+                  <div key={`slider-${i}`} className={cn("w-1.5 h-1.5 rounded-full transition-all duration-300", i === currentSlide ? "bg-white w-4" : "bg-white/40")} />
                 ))
               ) : (
                 [1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className={cn("w-1.5 h-1.5 rounded-full", i === 1 ? "bg-white w-4" : "bg-white/40")} />
+                  <div key={`dummy-${i}`} className={cn("w-1.5 h-1.5 rounded-full", i === 1 ? "bg-white w-4" : "bg-white/40")} />
                 ))
               )}
             </div>
           </div>
 
           <div className="flex gap-2.5 overflow-x-auto hide-scrollbar py-2.5 px-1">
-            {allCategories.map(cat => (
+            {allCategories.map((cat, idx) => (
               <motion.button 
                 whileHover={{ y: -4, scale: 1.02 }}
                 whileTap={{ scale: 0.95 }}
-                key={cat.id}
+                key={`${cat.id}-${idx}`}
                 onClick={() => setFilter(cat.name)}
                 className={cn(
                    "group relative min-w-[85px] h-24 rounded-[24px] overflow-hidden flex flex-col items-center justify-center gap-1 transition-all duration-500 shadow-sm",
@@ -3084,7 +3091,7 @@ const PublicStore = ({
               <div className="flex gap-6 overflow-x-auto no-scrollbar pb-8 -mx-6 px-6 snap-x">
                 {offers.slice(0, 5).map((offer, i) => (
                   <motion.div 
-                    key={offer.id}
+                    key={`${offer.id}-${i}`}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 }}
@@ -3148,7 +3155,7 @@ const PublicStore = ({
           <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4 -mx-4 px-4">
             {products.slice(0, 6).map((product, i) => (
               <motion.div 
-                key={product.id}
+                key={`${product.id}-${i}`}
                 initial={{ opacity: 0, x: 50, scale: 0.8 }}
                 whileInView={{ opacity: 1, x: 0, scale: 1 }}
                 viewport={{ once: true }}
@@ -3196,7 +3203,7 @@ const PublicStore = ({
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product, i) => (
             <motion.div 
-              key={product.id}
+              key={`${product.id}-${i}`}
               initial={{ opacity: 0, y: 30, scale: 0.8 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -3376,7 +3383,7 @@ const ClientList = ({
       <div className="space-y-3">
         {filteredClients.map((client, idx) => (
           <motion.div 
-            key={client.id}
+            key={`${client.id}-${idx}`}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.05 }}
@@ -3476,8 +3483,8 @@ const ManageServices = ({ withPassword }: { withPassword: (action: () => void) =
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {services.map(service => (
-          <div key={service.id} className="p-4 border dark:border-slate-800 rounded-2xl relative group">
+        {services.map((service, idx) => (
+          <div key={`${service.id}-${idx}`} className="p-4 border dark:border-slate-800 rounded-2xl relative group">
             <div className="flex justify-between items-start mb-4">
               <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-[#dc143c] overflow-hidden">
                 {service.imageUrl ? <img src={service.imageUrl} className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" /> : <i className={`bx ${service.icon} text-2xl`}></i>}
@@ -3603,9 +3610,9 @@ const StaffTrackingMap = ({ staff }: { staff: Staff[] }) => {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
-        {staff.filter(s => s.lastKnownLocation).map(member => (
+        {staff.filter(s => s.lastKnownLocation).map((member, idx) => (
           <Marker 
-            key={member.id} 
+            key={`${member.id}-${idx}`} 
             position={[member.lastKnownLocation!.lat, member.lastKnownLocation!.lng]}
           >
             <LeafletTooltip permanent direction="top" offset={[0, -10]} opacity={1}>
@@ -3955,8 +3962,8 @@ const ManageStaff = ({ withPassword, addNotification }: { withPassword: (action:
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
           <StaffTrackingMap staff={filteredStaff} />
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filteredStaff.map(member => (
-              <div key={member.id} className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4">
+            {filteredStaff.map((member, idx) => (
+              <div key={`${member.id}-${idx}`} className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4">
                 <div className="relative shrink-0">
                   {member.image ? (
                     <img src={member.image} className="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-slate-800 shadow-sm" alt={member.name} />
@@ -3982,9 +3989,9 @@ const ManageStaff = ({ withPassword, addNotification }: { withPassword: (action:
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10 py-6">
-          {filteredStaff.map(member => (
+          {filteredStaff.map((member, idx) => (
             <motion.div 
-              key={member.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              key={`${member.id}-${idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             >
               <StaffFlipCard 
                 member={member}
@@ -4444,8 +4451,8 @@ const StaffCheckIn = ({ user, staffUser }: { user: FirebaseUser | null, staffUse
             <div className="p-5 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
                <h4 className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold mb-3"><DollarSign size={16} /> Salary History</h4>
                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                 {[...staffInfo.salaries].sort((a, b) => b.id.localeCompare(a.id)).map(salary => (
-                   <div key={salary.id} className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-emerald-100/50 dark:border-emerald-800/30">
+                 {[...staffInfo.salaries].sort((a, b) => b.id.localeCompare(a.id)).map((salary, idx) => (
+                   <div key={`${salary.id}-${idx}`} className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-emerald-100/50 dark:border-emerald-800/30">
                      <div className="flex justify-between items-center mb-2 border-b border-slate-100 dark:border-slate-700 pb-2">
                        <span className="font-bold text-slate-700 dark:text-slate-200">{salary.monthName}</span>
                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">{salary.status}</span>
@@ -4606,8 +4613,8 @@ const WarrantyPage = ({ clients }: { clients: Client[] }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {clientsWithWarranty.map(client => (
-            <div key={client.id} className="glass-card p-4 rounded-3xl border border-gray-100 dark:border-slate-800 flex items-center justify-between">
+          {clientsWithWarranty.map((client, idx) => (
+            <div key={`${client.id}-${idx}`} className="glass-card p-4 rounded-3xl border border-gray-100 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-blue-600/10 rounded-2xl flex items-center justify-center text-blue-600 font-bold">
                   {client.name[0]}
@@ -4893,8 +4900,8 @@ const AddProductModal = ({
                   }
                 }}
               >
-                {productCategories.map(cat => (
-                  <option key={cat.id} value={cat.name} className="bg-slate-900 text-white">{cat.name}</option>
+                {productCategories.map((cat, idx) => (
+                  <option key={`${cat.id}-${idx}`} value={cat.name} className="bg-slate-900 text-white">{cat.name}</option>
                 ))}
                 <option value="add_new" className="bg-slate-900 text-blue-400 font-bold">+ Add New Category</option>
               </select>
@@ -5284,8 +5291,8 @@ const EditProductModal = ({
                   }
                 }}
               >
-                {productCategories.map(cat => (
-                  <option key={cat.id} value={cat.name} className="bg-slate-900 text-white">{cat.name}</option>
+                {productCategories.map((cat, idx) => (
+                  <option key={`${cat.id}-${idx}`} value={cat.name} className="bg-slate-900 text-white">{cat.name}</option>
                 ))}
                 <option value="add_new" className="bg-slate-900 text-blue-400 font-bold">+ Add New Category</option>
               </select>
@@ -5915,7 +5922,7 @@ const CartDrawer = ({
                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Order Summary</h3>
                     {cart.map((item, idx) => (
                       <motion.div 
-                        key={item.productId}
+                        key={`${item.productId}-${idx}`}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.05 }}
@@ -6072,6 +6079,7 @@ function AppContent() {
   const [customClickSound, setCustomClickSound] = useState<string | null>(() => localStorage.getItem('cctv_custom_click_sound'));
   const [offersMusic, setOffersMusic] = useState<string | null>(() => localStorage.getItem('cctv_offers_music'));
   const offersAudioRef = useRef<HTMLAudioElement | null>(null);
+  const notificationIdRef = useRef(0);
   
   const adminEmails = [
     'itdepartmentpro33@gmail.com', 
@@ -6107,6 +6115,7 @@ function AppContent() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showCart, setShowCart] = useState(false);
+  const [addedToCartProduct, setAddedToCartProduct] = useState<Product | null>(null);
   const [showClientProfile, setShowClientProfile] = useState<Client | null>(null);
   const [showAddClient, setShowAddClient] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
@@ -6128,6 +6137,61 @@ function AppContent() {
     setClientProfile(null);
     setActiveTab('dashboard');
   };
+
+  useEffect(() => {
+    if (!db || !isAuthReady) return;
+
+    // 1. All Data Listeners
+    const unsubscribeProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const updatedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(updatedProducts);
+    });
+
+    const unsubscribeOrders = onSnapshot(collection(db, 'public_orders'), (snapshot) => {
+      const updatedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PublicOrder));
+      setPublicOrders(updatedOrders);
+    });
+
+    // 2. Auth-Restricted Listeners
+    let unsubscribeClients = () => {};
+    if (isAdmin && user) {
+      unsubscribeClients = onSnapshot(collection(db, 'clients'), (snapshot) => {
+        const updatedClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Client));
+        setClients(updatedClients);
+      });
+    }
+
+    // 3. New Event Notification Listeners
+    const newOrdersQuery = query(collection(db, 'public_orders'), orderBy('createdAt', 'desc'), limit(1));
+    const unsubscribeNewOrders = onSnapshot(newOrdersQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const newOrder = change.doc.data() as PublicOrder;
+          addNotification(`New Order: BDT ${newOrder.total} from ${newOrder.customerName}`, 'admin-order', newOrder);
+        }
+      });
+    });
+
+    const productsQuery = collection(db, 'products');
+    const unsubscribeLowStock = onSnapshot(productsQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified') {
+          const product = change.doc.data() as Product;
+          if (product.stock < 5 && product.stock > 0) {
+            addNotification(`Low Stock Alert: ${product.name} is running low (${product.stock} left)`);
+          }
+        }
+      });
+    });
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeOrders();
+      unsubscribeClients();
+      unsubscribeNewOrders();
+      unsubscribeLowStock();
+    };
+  }, [isAuthReady, user, isAdmin, db]);
 
   useEffect(() => {
     if (isAuthReady && user) {
@@ -6238,15 +6302,32 @@ function AppContent() {
   };
   const [productCategories, setProductCategories] = useState<CategoryData[]>(() => {
     const saved = localStorage.getItem('cctv_product_categories');
+    let cats: CategoryData[] = [];
     if (saved) {
-      const parsed = JSON.parse(saved);
-      // Migration: if saved items are strings, convert to CategoryData objects
-      if (parsed.length > 0 && typeof parsed[0] === 'string') {
-        return parsed.map((name: string) => ({ id: name.toLowerCase().replace(/\s+/g, '_'), name }));
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0 && typeof parsed[0] === 'string') {
+            cats = parsed.map((name: string) => ({ id: name.toLowerCase().replace(/\s+/g, '_'), name }));
+          } else {
+            cats = parsed;
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing cctv_product_categories", e);
       }
-      return parsed;
     }
-    return Object.values(Category).map(cat => ({ id: cat, name: cat }));
+    if (cats.length === 0) {
+      cats = Object.values(Category).map(cat => ({ id: cat, name: cat }));
+    }
+    const seen = new Set<string>();
+    return cats.filter(c => {
+      if (!c || !c.id) return false;
+      const key = String(c.id).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   });
   const [expenseCategories, setExpenseCategories] = useState<string[]>(() => {
     const saved = localStorage.getItem('cctv_expense_categories');
@@ -6356,9 +6437,18 @@ function AppContent() {
           if (updatedCats.length > 0 && typeof updatedCats[0] === 'string') {
             updatedCats = updatedCats.map((name: string) => ({ id: name.toLowerCase().replace(/\s+/g, '_'), name }));
           }
-          setProductCategories(updatedCats);
-          lastSyncedSettings.current.productCategories = JSON.stringify(updatedCats);
-          localStorage.setItem('cctv_product_categories', JSON.stringify(updatedCats));
+          // Deduplicate
+          const seen = new Set<string>();
+          const deduplicated = updatedCats.filter((c: any) => {
+            if (!c || !c.id) return false;
+            const key = String(c.id).toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          setProductCategories(deduplicated);
+          lastSyncedSettings.current.productCategories = JSON.stringify(deduplicated);
+          localStorage.setItem('cctv_product_categories', JSON.stringify(deduplicated));
         }
         if (data.customIntroMusic !== undefined) {
           setCustomIntroMusic(data.customIntroMusic);
@@ -6695,8 +6785,8 @@ function AppContent() {
     }
   };
 
-  const addNotification = (text: string, type: 'info' | 'success' | 'admin-order' | 'error' = 'info', order?: PublicOrder) => {
-    const id = Date.now() + Math.random();
+  const addNotification = useCallback((text: string, type: 'info' | 'success' | 'admin-order' | 'error' = 'info', order?: PublicOrder) => {
+    const id = Date.now() + notificationIdRef.current++;
     setNotifications(prev => [...prev, { id, text, type, order }]);
     
     // Admin orders stay longer
@@ -6705,7 +6795,7 @@ function AppContent() {
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, duration);
-  };
+  }, []);
 
   // --- Logic Functions ---
 
@@ -6956,6 +7046,7 @@ function AppContent() {
       return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1, image: product.image }];
     });
     addNotification(`${product.name} added to cart`);
+    setAddedToCartProduct(product);
   };
 
   const removeFromCart = (productId: number) => {
@@ -8427,9 +8518,9 @@ const PaymentGateway = ({ amount, onComplete, onClose }: { amount: number, onCom
             ) : (
               <div className="space-y-6">
                 <div className="space-y-4">
-                  {cart.map(item => (
+                  {cart.map((item, idx) => (
                     <motion.div 
-                      key={item.productId} 
+                      key={`${item.productId}-${idx}`} 
                       className="flex justify-between items-center p-4 bg-gray-50 dark:bg-slate-800/50 rounded-3xl border border-gray-100 dark:border-slate-800"
                     >
                       <div className="flex items-center gap-4">
@@ -8479,8 +8570,8 @@ const PaymentGateway = ({ amount, onComplete, onClose }: { amount: number, onCom
                         value={orderClientId || ''}
                       >
                         <option value="">New Customer (Public Order)...</option>
-                        {clients.map(c => (
-                          <option key={c.id} value={c.id}>{c.name} — {c.phone}</option>
+                        {clients.map((c, idx) => (
+                          <option key={`${c.id}-${idx}`} value={c.id}>{c.name} — {c.phone}</option>
                         ))}
                       </select>
                       <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
@@ -9525,9 +9616,9 @@ const SourceCodeExplorerModal = ({ onClose }: { onClose: () => void }) => {
           {/* Sidebar file list */}
           <div className="w-full md:w-56 border-r border-slate-100 dark:border-slate-800/80 p-4 overflow-y-auto space-y-1 bg-slate-50/50 dark:bg-slate-950/25 shrink-0">
             <span className="text-[9px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest block px-2 mb-2">Workspace Files</span>
-            {files.map(file => (
+            {files.map((file, idx) => (
               <button
-                key={file}
+                key={`${file}-${idx}`}
                 onClick={() => setSelectedFile(file)}
                 className={`w-full text-left p-2 rounded-xl text-xs font-semibold tracking-wide transition-all truncate flex items-center gap-2 ${
                   selectedFile === file 
@@ -10126,7 +10217,7 @@ const MePage = ({
             <div className="space-y-4">
               {clientData.paymentHistory && clientData.paymentHistory.length > 0 ? (
                 clientData.paymentHistory.map((payment: any, idx: number) => (
-                  <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between">
+                  <div key={payment.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between">
                     <div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{payment.type}</p>
                       <h4 className="font-bold text-green-600">+{formatCurrency(payment.amount)}</h4>
@@ -10156,7 +10247,7 @@ const MePage = ({
             <div className="space-y-4">
               {clientData?.orders && clientData.orders.length > 0 ? (
                 clientData.orders.map((order: any, idx: number) => (
-                  <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between group">
+                  <div key={order.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between group">
                     <div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Order #{order.id}</p>
                       <h4 className="font-bold text-slate-900 dark:text-white">{formatCurrency(order.total)}</h4>
@@ -10673,8 +10764,8 @@ const MePage = ({
           {expenses.length === 0 ? (
             <p className="text-center text-gray-400 py-8 text-sm italic col-span-full">No expenses recorded</p>
           ) : (
-            expenses.map(exp => (
-              <div key={exp.id} className="glass-card p-3 flex justify-between items-center">
+            expenses.map((exp, idx) => (
+              <div key={`${exp.id}-${idx}`} className="glass-card p-3 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center justify-center text-red-600">
                     <Wallet size={18} />
@@ -11264,6 +11355,14 @@ const MePage = ({
         {showClientProfile && <ClientProfile client={showClientProfile} onClose={() => setShowClientProfile(null)} onUpdateImage={handleUpdateClientImage} onSetWarranty={handleSetWarranty} onSetInstallationDate={handleSetInstallationDate} onUpdateNotes={handleUpdateNotes} onDeleteClient={(id) => withPassword(() => handleDeleteClient(id))} onUpdateOrderStatus={updateOrderStatus} onUpdateClientDetails={handleUpdateClientDetails} formatCurrency={formatCurrency} generateWhatsAppMessage={generateWhatsAppMessage} generateClientProfilePDF={generateClientProfilePDF} handleDeleteWork={handleDeleteWork} handleDeletePayment={handleDeletePayment} handleDeleteOrder={handleDeleteOrder} handleAddWork={handleAddWork} handleAddPayment={handleAddPayment} clients={clients} />}
         {showAddClient && <AddClientModal onClose={() => setShowAddClient(false)} />}
         {showCalculator && <CalculatorModal onClose={() => setShowCalculator(false)} />}
+        {addedToCartProduct && (
+          <AddedToCartModal
+            product={addedToCartProduct}
+            onClose={() => setAddedToCartProduct(null)}
+            onOpenCart={() => setShowCart(true)}
+            formatCurrency={formatCurrency}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
@@ -11278,6 +11377,104 @@ const getStatusColor = (status: OrderStatus) => {
     case OrderStatus.CANCELLED: return 'bg-rose-100 text-rose-600';
     default: return 'bg-gray-100 text-gray-600';
   }
+};
+
+const AddedToCartModal = ({ 
+  product, 
+  onClose, 
+  onOpenCart,
+  formatCurrency
+}: { 
+  product: Product, 
+  onClose: () => void, 
+  onOpenCart: () => void,
+  formatCurrency: (amount: number) => string
+}) => {
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 p-6 flex flex-col gap-5 shadow-2xl relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#bf0528]/5 rounded-full blur-2xl -ml-6 -mb-6 pointer-events-none" />
+
+        <div className="flex flex-col items-center text-center">
+          <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center shadow-inner animate-bounce mb-3">
+            <svg 
+              className="w-8 h-8 font-black" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24" 
+              strokeWidth="3"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            কার্টে যোগ করা হয়েছে!
+          </h3>
+          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-0.5">
+            PRODUCT ADDED TO CART
+          </p>
+        </div>
+
+        <div className="flex gap-4 p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 rounded-2xl items-center">
+          {product.image ? (
+            <img 
+              src={product.image} 
+              alt={product.name} 
+              className="w-16 h-16 object-cover rounded-xl border border-slate-200 dark:border-slate-800 shrink-0" 
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center shrink-0">
+               <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+               </svg>
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-black text-slate-900 dark:text-white truncate uppercase tracking-tight">
+              {product.name}
+            </h4>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider bg-slate-200/60 dark:bg-slate-800/80 px-2 py-0.5 rounded">
+                Category: {product.category}
+              </span>
+            </div>
+            <p className="text-base font-black text-[#bf0528] dark:text-emerald-400 mt-1">
+              {formatCurrency(product.price)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2.5 mt-2">
+          <button 
+            onClick={() => {
+              onClose();
+              onOpenCart();
+            }}
+            className="w-full py-3.5 bg-gradient-to-r from-[#bf0528] to-[#990420] text-white hover:opacity-95 font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md shadow-red-950/20 active:scale-98 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            কার্ট ও অর্ডার নিশ্চিত করুন (GO TO CART)
+          </button>
+          <button 
+            onClick={onClose}
+            className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-200 font-black text-xs uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            আরো পছন্দ করুন 🛍️ (CONTINUE SHOPPING)
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
 };
 
 const MyOrdersPage = ({ user, clients, formatCurrency, isAdmin, acceptPublicOrder, addNotification, deleteAnyOrder }: { user: any | null, clients: Client[], formatCurrency: (amount: number) => string, isAdmin: boolean, acceptPublicOrder: (order: PublicOrder) => Promise<void>, addNotification: (msg: string, type?: any) => void, deleteAnyOrder: (order: any) => Promise<void> }) => {
@@ -11399,7 +11596,7 @@ const MyOrdersPage = ({ user, clients, formatCurrency, isAdmin, acceptPublicOrde
                 <ShoppingCart size={12} /> Items
               </div>
               {order.items.map((item: any, i: number) => (
-                <div key={i} className="flex justify-between items-center text-xs group/item">
+                <div key={`${item.productId}-${i}`} className="flex justify-between items-center text-xs group/item">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold">
                        {item.quantity}x
@@ -11926,8 +12123,8 @@ const ClientProfile = ({
           {currentClient.workHistory.length === 0 ? (
             <p className="text-xs text-gray-400 italic text-center py-4">No work history found</p>
           ) : (
-            currentClient.workHistory.map(work => (
-              <div key={work.id} className="glass-card p-3 group">
+            currentClient.workHistory.map((work, idx) => (
+              <div key={`${work.id}-${idx}`} className="glass-card p-3 group">
                 <div className="flex justify-between">
                   <span className="text-xs font-bold">{work.description}</span>
                   <div className="flex items-center gap-2">
@@ -11956,8 +12153,8 @@ const ClientProfile = ({
           {currentClient.paymentHistory.length === 0 ? (
             <p className="text-xs text-gray-400 italic text-center py-4">No payments found</p>
           ) : (
-            currentClient.paymentHistory.map(payment => (
-              <div key={payment.id} className="glass-card p-3 flex justify-between items-center group">
+            currentClient.paymentHistory.map((payment, idx) => (
+              <div key={`${payment.id}-${idx}`} className="glass-card p-3 flex justify-between items-center group">
                 <div className="flex items-center gap-3">
                   <div>
                     <p className="text-xs font-bold">{payment.type}</p>
@@ -12049,7 +12246,7 @@ const ClientProfile = ({
                 <div className="space-y-1 mt-4 pt-3 border-t dark:border-slate-800">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Items</p>
                   {order.items.map((item, i) => (
-                    <div key={i} className="flex justify-between text-[10px] font-medium">
+                    <div key={`${item.productId}-${i}`} className="flex justify-between text-[10px] font-medium">
                       <span className="text-gray-600 dark:text-gray-400">{item.name} x {item.quantity}</span>
                       <span className="font-bold">{formatCurrency(item.price * item.quantity)}</span>
                     </div>
