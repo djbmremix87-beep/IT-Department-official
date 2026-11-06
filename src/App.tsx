@@ -6341,9 +6341,12 @@ function AppContent() {
     'itdepartmentpro33@gmail.com', 
     'djbmremix87@gmail.com',
     'itdepartmentpro33@app.internal',
-    'djbmremix87@app.internal'
+    'djbmremix87@app.internal',
+    'niloy@itdepartment.admin',
+    'niloy@gmail.com',
+    'niloy'
   ];
-  const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
+  const isAdmin = !!(user?.email && (adminEmails.includes(user.email.toLowerCase()) || user.email.toLowerCase().startsWith('niloy')));
 
   // Removed automatic redirection to shop-view for admins to avoid confusion
   useEffect(() => {
@@ -8657,17 +8660,21 @@ function AppContent() {
       setLoading(true);
       setErrorMsg('');
       try {
-        const res = await loginWithEmail(email, password);
+        let authEmail = email.trim();
+        if (authEmail.toLowerCase() === 'niloy') {
+          authEmail = 'niloy@itdepartment.admin';
+        }
+        const res = await loginWithEmail(authEmail, password);
         if (res && res.user && res.user.email) {
-          if (adminEmails.includes(res.user.email.toLowerCase())) {
+          if (adminEmails.includes(res.user.email.toLowerCase()) || res.user.email.toLowerCase().startsWith('niloy')) {
             setShowPasswordModal(false);
-            addNotification("Admin Email Authentication successful!");
+            addNotification("Admin Authentication successful!");
             if (passwordCallback) {
               passwordCallback.onSuccess();
               setPasswordCallback(null);
             }
           } else {
-            setErrorMsg(`Signed in as ${res.user.email}, but account is not in Admin list.`);
+            setErrorMsg(`Signed in as ${res.user.email}, but account is not authorized as Admin.`);
           }
         }
       } catch (err: any) {
@@ -8697,7 +8704,7 @@ function AppContent() {
               <ShieldCheck size={36} />
             </div>
             <h3 className="text-xl font-black text-white">Administrator Authentication</h3>
-            <p className="text-xs text-slate-400 mt-1">Sign in with an authorized Firebase Administrator account</p>
+            <p className="text-xs text-slate-400 mt-1">Sign in with username <code className="text-cyan-400 font-bold">niloy</code> or authorized admin email</p>
           </div>
 
           {errorMsg && (
@@ -8718,16 +8725,16 @@ function AppContent() {
 
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-slate-800" />
-              <span className="text-[10px] uppercase font-bold text-slate-500">OR EMAIL LOGIN</span>
+              <span className="text-[10px] uppercase font-bold text-slate-500">OR USERNAME / EMAIL LOGIN</span>
               <div className="flex-1 h-px bg-slate-800" />
             </div>
 
             <form onSubmit={handleEmailAuth} className="space-y-3">
               <input 
-                type="email"
+                type="text"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="Admin Email (e.g. djbmremix87@gmail.com)"
+                placeholder="Admin Username or Email (e.g. niloy)"
                 required
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-cyan-400"
               />
