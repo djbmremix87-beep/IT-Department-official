@@ -7,7 +7,7 @@ import { execSync } from "child_process";
 import { GoogleGenAI } from "@google/genai";
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -18,8 +18,42 @@ const ai = new GoogleGenAI({
   }
 });
 
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
+// Middleware: Body limits & security headers
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  next();
+});
+
+// Simple in-memory rate limiting for API endpoints
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const rateLimitMiddleware = (maxRequests = 60, windowMs = 60000) => {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + windowMs };
+
+    if (now > record.resetTime) {
+      record.count = 1;
+      record.resetTime = now + windowMs;
+    } else {
+      record.count++;
+    }
+
+    rateLimitMap.set(ip, record);
+
+    if (record.count > maxRequests) {
+      return res.status(429).json({ error: "Too many requests. Please slow down." });
+    }
+    next();
+  };
+};
+
+app.use("/api/", rateLimitMiddleware(100, 60000));
 
 // AI endpoint
 app.post("/api/ai/chat", async (req, res) => {
@@ -28,17 +62,21 @@ app.post("/api/ai/chat", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-      return res.status(400).json({ error: "Gemini API key is missing or is the default placeholder. Please set a valid GEMINI_API_KEY in the Secrets panel." });
+      return res.status(400).json({ error: "Gemini API key is missing or is the default placeholder. Please set a valid GEMINI_API_KEY in environment variables." });
+    }
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "Invalid messages format." });
     }
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: messages.map((m: any) => ({
         role: m.role === 'model' ? 'model' : 'user',
-        parts: [{ text: m.text }]
+        parts: [{ text: String(m.text || '') }]
       })),
       config: {
-        systemInstruction: systemInstruction,
+        systemInstruction: systemInstruction ? String(systemInstruction) : undefined,
       }
     });
 
@@ -46,6 +84,51 @@ app.post("/api/ai/chat", async (req, res) => {
   } catch (error: any) {
     console.error("AI Error:", error);
     res.status(500).json({ error: error.message || "Failed to process AI request" });
+  }
+});
+
+// Secure Server-side Telegram Proxy Endpoint
+app.post("/api/telegram/send", async (req, res) => {
+  try {
+    const { botToken, chatId, message, parseMode = 'HTML', lat, lng } = req.body;
+    const token = botToken || process.env.TELEGRAM_BOT_TOKEN;
+    const chat = chatId || process.env.TELEGRAM_CHAT_ID;
+
+    if (!token || !chat) {
+      return res.status(400).json({ error: "Telegram botToken and chatId are required." });
+    }
+
+    if (lat !== undefined && lng !== undefined) {
+      const url = `https://api.telegram.org/bot${token.trim()}/sendLocation`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chat.trim(), latitude: lat, longitude: lng })
+      });
+      const data = await response.json();
+      return res.json(data);
+    }
+
+    if (message) {
+      const url = `https://api.telegram.org/bot${token.trim()}/sendMessage`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chat.trim(),
+          text: String(message),
+          parse_mode: parseMode,
+          disable_web_page_preview: false
+        })
+      });
+      const data = await response.json();
+      return res.json(data);
+    }
+
+    res.status(400).json({ error: "Missing message or location coordinates." });
+  } catch (err: any) {
+    console.error("Telegram proxy error:", err);
+    res.status(500).json({ error: "Telegram error: " + err.message });
   }
 });
 
@@ -58,12 +141,13 @@ app.post("/api/deploy", async (req, res) => {
   try {
     const { file, apkFile, apkFileName } = req.body;
     if (!file) {
-      res.status(400).json({ error: "No file provided" });
-      return;
+      return res.status(400).json({ error: "No file provided" });
     }
 
-    // Extract base64 data section: data:application/zip;base64,....
     const base64Data = file.split(';base64,').pop();
+    if (!base64Data) {
+      return res.status(400).json({ error: "Invalid base64 payload" });
+    }
     const buffer = Buffer.from(base64Data, 'base64');
 
     const zip = await JSZip.loadAsync(buffer);
@@ -72,20 +156,23 @@ app.post("/api/deploy", async (req, res) => {
     
     fs.mkdirSync(targetDir, { recursive: true });
 
-    // Try to save APK if uploaded
     if (apkFile) {
         const apkBase64Data = apkFile.split(';base64,').pop();
-        const apkBuffer = Buffer.from(apkBase64Data, 'base64');
-        fs.writeFileSync(path.join(targetDir, apkFileName || 'app.apk'), apkBuffer);
+        if (apkBase64Data) {
+          const apkBuffer = Buffer.from(apkBase64Data, 'base64');
+          fs.writeFileSync(path.join(targetDir, apkFileName || 'app.apk'), apkBuffer);
+        }
     }
 
     const promises: Promise<void>[] = [];
 
     zip.forEach((relativePath, zipEntry) => {
+      // Prevent path traversal vulnerabilities
+      const safePath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
       if (!zipEntry.dir) {
         promises.push(
           zipEntry.async("nodebuffer").then((content) => {
-            const filePath = path.join(targetDir, relativePath);
+            const filePath = path.join(targetDir, safePath);
             fs.mkdirSync(path.dirname(filePath), { recursive: true });
             fs.writeFileSync(filePath, content);
           })
@@ -102,46 +189,35 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-// Serve the deployments
+// Serve static deployments
 app.use("/d", express.static(DEPLOYMENTS_DIR));
 
-// --- Source Code Explorer Endpoints ---
+// Source Code Explorer Endpoints (Safe allowlist)
+const ALLOWED_SOURCE_FILES = [
+  "src/App.tsx",
+  "src/types.ts",
+  "src/firebase.ts",
+  "src/index.css",
+  "src/main.tsx",
+  "src/lib/utils.ts",
+  "src/lib/telegram.ts",
+  "src/lib/cache.ts",
+  "package.json",
+  "vite.config.ts",
+  "tsconfig.json",
+  "server.ts",
+  "index.html",
+  "firestore.rules"
+];
+
 app.get("/api/source-code/list", (req, res) => {
-  const safeList = [
-    "src/App.tsx",
-    "src/types.ts",
-    "src/firebase.ts",
-    "src/index.css",
-    "src/main.tsx",
-    "src/lib/utils.ts",
-    "package.json",
-    "vite.config.ts",
-    "tsconfig.json",
-    "server.ts",
-    "index.html",
-    "firestore.rules"
-  ];
-  res.json({ files: safeList });
+  res.json({ files: ALLOWED_SOURCE_FILES });
 });
 
 app.get("/api/source-code/file", (req, res) => {
   try {
     const relativePath = String(req.query.path || "");
-    const safeList = [
-      "src/App.tsx",
-      "src/types.ts",
-      "src/firebase.ts",
-      "src/index.css",
-      "src/main.tsx",
-      "src/lib/utils.ts",
-      "package.json",
-      "vite.config.ts",
-      "tsconfig.json",
-      "server.ts",
-      "index.html",
-      "firestore.rules"
-    ];
-    if (!safeList.includes(relativePath)) {
+    if (!ALLOWED_SOURCE_FILES.includes(relativePath)) {
       return res.status(403).json({ error: "Access denied or file not allowed" });
     }
     const fullPath = path.join(process.cwd(), relativePath);
@@ -157,22 +233,8 @@ app.get("/api/source-code/file", (req, res) => {
 
 app.get("/api/source-code/all-combined", (req, res) => {
   try {
-    const relativeFiles = [
-      "src/App.tsx",
-      "src/types.ts",
-      "src/firebase.ts",
-      "src/index.css",
-      "src/main.tsx",
-      "src/lib/utils.ts",
-      "package.json",
-      "vite.config.ts",
-      "tsconfig.json",
-      "server.ts",
-      "index.html",
-      "firestore.rules"
-    ];
     let combined = "";
-    for (const relPath of relativeFiles) {
+    for (const relPath of ALLOWED_SOURCE_FILES) {
       const fullPath = path.join(process.cwd(), relPath);
       if (fs.existsSync(fullPath)) {
         const content = fs.readFileSync(fullPath, "utf-8");
@@ -191,23 +253,8 @@ app.get("/api/source-code/all-combined", (req, res) => {
 
 app.get("/api/source-code/download-zip", async (req, res) => {
   try {
-    const relativeFiles = [
-      "src/App.tsx",
-      "src/types.ts",
-      "src/firebase.ts",
-      "src/index.css",
-      "src/main.tsx",
-      "src/lib/utils.ts",
-      "package.json",
-      "vite.config.ts",
-      "tsconfig.json",
-      "server.ts",
-      "index.html",
-      "firestore.rules"
-    ];
-    
     const zip = new JSZip();
-    for (const relPath of relativeFiles) {
+    for (const relPath of ALLOWED_SOURCE_FILES) {
       const fullPath = path.join(process.cwd(), relPath);
       if (fs.existsSync(fullPath)) {
         const content = fs.readFileSync(fullPath);
@@ -227,10 +274,8 @@ app.get("/api/source-code/download-zip", async (req, res) => {
 
 app.get("/api/source-code/download-portable-html", async (req, res) => {
   try {
-    // 1. Run production build so we have the absolute latest code compiled in /dist
     execSync("npm run build", { stdio: "inherit" });
 
-    // 2. Locate dist/index.html
     const distIndex = path.join(process.cwd(), "dist", "index.html");
     if (!fs.existsSync(distIndex)) {
       return res.status(500).send("Build completed but dist/index.html was not found.");
@@ -238,7 +283,6 @@ app.get("/api/source-code/download-portable-html", async (req, res) => {
 
     let html = fs.readFileSync(distIndex, "utf-8");
 
-    // 3. Scan dist/assets/ for css and js files to inline
     const assetsDir = path.join(process.cwd(), "dist", "assets");
     if (fs.existsSync(assetsDir)) {
       const files = fs.readdirSync(assetsDir);
@@ -272,67 +316,12 @@ app.get("/api/source-code/download-portable-html", async (req, res) => {
       }
     }
 
-    // Set download headers
     res.setHeader("Content-Disposition", "attachment; filename=crm-system-portable.html");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html);
   } catch (err: any) {
     console.error("Portable HTML generation failed:", err);
     res.status(500).send("Failed to generate portable HTML: " + err.message);
-  }
-});
-
-app.get("/api/source-code/portable-html-text", async (req, res) => {
-  try {
-    // 1. Run production build so we have the absolute latest code compiled in /dist
-    execSync("npm run build", { stdio: "inherit" });
-
-    // 2. Locate dist/index.html
-    const distIndex = path.join(process.cwd(), "dist", "index.html");
-    if (!fs.existsSync(distIndex)) {
-      return res.status(500).json({ error: "Build completed but dist/index.html was not found." });
-    }
-
-    let html = fs.readFileSync(distIndex, "utf-8");
-
-    // 3. Scan dist/assets/ for css and js files to inline
-    const assetsDir = path.join(process.cwd(), "dist", "assets");
-    if (fs.existsSync(assetsDir)) {
-      const files = fs.readdirSync(assetsDir);
-      
-      for (const file of files) {
-        const filePath = path.join(assetsDir, file);
-        const ext = path.extname(file).toLowerCase();
-        
-        if (ext === ".css") {
-          const cssContent = fs.readFileSync(filePath, "utf-8");
-          const linkPattern = new RegExp(`<link[^>]*href=["'][^"']*assets/${file}["'][^>]*>`, "g");
-          if (linkPattern.test(html)) {
-            html = html.replace(linkPattern, `<style>${cssContent}</style>`);
-          } else {
-            html = html.replace("</head>", `<style>${cssContent}</style></head>`);
-          }
-        } else if (ext === ".js") {
-          const jsContent = fs.readFileSync(filePath, "utf-8");
-          const scriptPattern = new RegExp(`<script[^>]*src=["'][^"']*assets/${file}["'][^>]*>\\s*</script>`, "g");
-          if (scriptPattern.test(html)) {
-            html = html.replace(scriptPattern, `<script type="module">${jsContent}</script>`);
-          } else {
-            const scriptPattern2 = new RegExp(`<script[^>]*src=["'][^"']*assets/${file}["'][^>]*></script>`, "g");
-            if (scriptPattern2.test(html)) {
-              html = html.replace(scriptPattern2, `<script type="module">${jsContent}</script>`);
-            } else {
-              html = html.replace("</body>", `<script type="module">${jsContent}</script></body>`);
-            }
-          }
-        }
-      }
-    }
-
-    res.json({ html });
-  } catch (err: any) {
-    console.error("Portable HTML generation failed:", err);
-    res.status(500).json({ error: "Failed to generate portable HTML: " + err.message });
   }
 });
 

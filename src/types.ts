@@ -117,3 +117,91 @@ export interface PublicOrder {
   date: string;
   status: 'pending' | 'accepted' | 'rejected';
 }
+
+// Support Ticket System
+export enum TicketPriority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  URGENT = 'urgent'
+}
+
+export enum TicketStatus {
+  OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  RESOLVED = 'resolved',
+  CLOSED = 'closed'
+}
+
+export interface TicketMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'client' | 'staff' | 'admin';
+  message: string;
+  timestamp: string;
+  isInternalNote?: boolean;
+}
+
+export interface SupportTicket {
+  id: string;
+  ticketNumber: string;
+  clientId?: number | string;
+  clientName: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  subject: string;
+  category: 'Network' | 'CCTV' | 'Billing' | 'Hardware' | 'General';
+  description: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  assignedStaffId?: string;
+  assignedStaffName?: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: TicketMessage[];
+}
+
+// Portfolio Management
+export interface PortfolioItem {
+  id: string;
+  title: string;
+  slug: string;
+  category: 'CCTV Installation' | 'Networking / ISP' | 'Access Control' | 'IT Infrastructure' | 'Maintenance';
+  description: string;
+  clientName?: string;
+  location?: string;
+  completionDate?: string;
+  image: string;
+  gallery?: string[];
+  technologies?: string[];
+  isPublished: boolean;
+  createdAt: string;
+}
+
+// Notification System
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'order' | 'ticket' | 'payment' | 'alert' | 'security';
+  read: boolean;
+  timestamp: string;
+  linkTab?: string;
+  metadata?: any;
+}
+
+// Audit Logging
+export interface AuditLog {
+  id: string;
+  actorId: string;
+  actorName: string;
+  actorRole: string;
+  action: string;
+  category?: 'AUTH' | 'FINANCE' | 'INVENTORY' | 'STAFF' | 'SETTINGS' | 'SYSTEM';
+  targetCollection?: string;
+  targetId?: string;
+  details: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}

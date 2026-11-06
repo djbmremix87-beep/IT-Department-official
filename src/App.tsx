@@ -35,6 +35,10 @@ import {
 
 import { QRPaymentModal } from './components/QRPaymentModal';
 import { TelegramModal } from './components/TelegramModal';
+import { SupportTicketSystem } from './components/SupportTicketSystem';
+import { PortfolioManager } from './components/PortfolioManager';
+import { AuditLogViewer } from './components/AuditLogViewer';
+import { NotificationCenterDrawer } from './components/NotificationCenterDrawer';
 import { 
   getDefaultTelegramConfig, 
   saveTelegramConfig, 
@@ -135,7 +139,8 @@ import {
   Camera,
   Eye,
   LogIn,
-  UserPlus
+  UserPlus,
+  Briefcase
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import gsap from 'gsap';
@@ -185,7 +190,13 @@ import {
   OrderStatus,
   WorkHistory,
   PaymentHistory,
-  PublicOrder
+  PublicOrder,
+  SupportTicket,
+  TicketMessage,
+  TicketStatus,
+  PortfolioItem,
+  AppNotification,
+  AuditLog
 } from './types';
 
 interface SalaryRecord {
@@ -5876,7 +5887,9 @@ const TopHeader = ({
   setActiveTab,
   customLogo,
   onOpenTelegram,
-  telegramConfig
+  telegramConfig,
+  unreadCount = 0,
+  onToggleNotifications
 }: { 
   user: any, 
   isAdmin: boolean, 
@@ -5888,12 +5901,14 @@ const TopHeader = ({
   setActiveTab: (t: string) => void,
   customLogo: string | null,
   onOpenTelegram?: () => void,
-  telegramConfig?: TelegramConfig
+  telegramConfig?: TelegramConfig,
+  unreadCount?: number,
+  onToggleNotifications?: () => void
 }) => {
   return (
     <div className="w-full flex flex-col z-[60] sticky top-0 shadow-sm select-none">
       <header className={cn(
-        "w-full bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 transition-all duration-300"
+        "w-full bg-slate-950/95 backdrop-blur-md border-b border-cyan-500/20 transition-all duration-300"
       )}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20 gap-4">
@@ -5904,16 +5919,16 @@ const TopHeader = ({
                 setActiveTab('shop-view');
               }}
             >
-              <div className="w-12 h-12 bg-[#111111] dark:bg-slate-900 rounded-full flex items-center justify-center text-white shadow-xl group-hover:scale-105 transition-all overflow-hidden border border-white/10 shrink-0">
+              <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center text-white shadow-xl group-hover:scale-105 transition-all overflow-hidden border border-cyan-500/30 shrink-0">
                  {customLogo ? (
                    <img src={customLogo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                  ) : (
-                   <ShieldCheck size={28} className="text-white" />
+                   <ShieldCheck size={28} className="text-cyan-400" />
                  )}
               </div>
               <div className="block">
-                <h1 className="text-base sm:text-lg font-black tracking-tighter leading-none dark:text-white uppercase text-slate-900">IT Department</h1>
-                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-0.5">Technology Partner</p>
+                <h1 className="text-base sm:text-lg font-black tracking-tighter leading-none text-white uppercase">IT Department</h1>
+                <p className="text-[8px] sm:text-[9px] font-bold text-cyan-400/70 uppercase tracking-[0.2em] mt-0.5">Technology Partner</p>
               </div>
             </div>
 
@@ -5922,56 +5937,60 @@ const TopHeader = ({
               <button
                 onClick={() => setActiveTab('shop-view')}
                 className={cn(
-                  "text-xs font-black uppercase tracking-widest transition-all hover:text-[#bf0528]",
+                  "text-xs font-black uppercase tracking-widest transition-all hover:text-cyan-400",
                   activeTab === 'shop-view' 
-                    ? "text-[#bf0528] border-b-2 border-[#bf0528] pb-1" 
-                    : "text-slate-700 dark:text-gray-300"
+                    ? "text-cyan-400 border-b-2 border-cyan-400 pb-1" 
+                    : "text-slate-300"
                 )}
               >
                 Home
               </button>
               <button
-                onClick={() => {
-                  setActiveTab('shop-view');
-                  const ev = new CustomEvent('set-product-filter', { detail: 'indoor' });
-                  window.dispatchEvent(ev);
-                }}
-                className="text-xs font-black uppercase tracking-widest transition-all text-slate-700 dark:text-gray-300 hover:text-[#bf0528]"
+                onClick={() => setActiveTab('portfolio')}
+                className={cn(
+                  "text-xs font-black uppercase tracking-widest transition-all hover:text-cyan-400",
+                  activeTab === 'portfolio' 
+                    ? "text-cyan-400 border-b-2 border-cyan-400 pb-1" 
+                    : "text-slate-300"
+                )}
               >
-                Cameras
+                Projects
               </button>
               <button
-                onClick={() => {
-                  setActiveTab('shop-view');
-                  const ev = new CustomEvent('set-product-filter', { detail: 'nvr' });
-                  window.dispatchEvent(ev);
-                }}
-                className="text-xs font-black uppercase tracking-widest transition-all text-slate-700 dark:text-gray-300 hover:text-[#bf0528]"
+                onClick={() => setActiveTab('tickets')}
+                className={cn(
+                  "text-xs font-black uppercase tracking-widest transition-all hover:text-cyan-400",
+                  activeTab === 'tickets' || activeTab === 'support' 
+                    ? "text-cyan-400 border-b-2 border-cyan-400 pb-1" 
+                    : "text-slate-300"
+                )}
               >
-                NVR & DVR
+                Support Tickets
               </button>
               <button
                 onClick={() => setActiveTab('offers')}
                 className={cn(
-                  "text-xs font-black uppercase tracking-widest transition-all hover:text-[#bf0528]",
+                  "text-xs font-black uppercase tracking-widest transition-all hover:text-cyan-400",
                   activeTab === 'offers' 
-                    ? "text-[#bf0528] border-b-2 border-[#bf0528] pb-1" 
-                    : "text-slate-700 dark:text-gray-300"
+                    ? "text-cyan-400 border-b-2 border-cyan-400 pb-1" 
+                    : "text-slate-300"
                 )}
               >
-                Special Offers
+                Offers
               </button>
-              <button
-                onClick={() => setActiveTab('my-orders')}
-                className={cn(
-                  "text-xs font-black uppercase tracking-widest transition-all hover:text-[#bf0528]",
-                  activeTab === 'my-orders' 
-                    ? "text-[#bf0528] border-b-2 border-[#bf0528] pb-1" 
-                    : "text-slate-700 dark:text-gray-300"
-                )}
-              >
-                Track Orders
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setActiveTab('audit-logs')}
+                  className={cn(
+                    "text-xs font-black uppercase tracking-widest transition-all hover:text-cyan-400",
+                    activeTab === 'audit-logs' 
+                      ? "text-cyan-400 border-b-2 border-cyan-400 pb-1" 
+                      : "text-slate-300"
+                  )}
+                >
+                  Audit Logs
+                </button>
+              )}
             </nav>
 
             {/* Actions */}
@@ -5979,22 +5998,38 @@ const TopHeader = ({
               <div className="hidden sm:flex relative group">
                 <input 
                   type="text" 
-                  placeholder="Premium Search..."
-                  className="w-48 xl:w-64 px-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-[#bf0528] rounded-2xl text-xs font-semibold tracking-wide transition-all outline-none"
+                  placeholder="Search products & services..."
+                  className="w-48 xl:w-64 px-4 py-2.5 bg-slate-900 border border-slate-800 focus:border-cyan-400 rounded-2xl text-xs font-semibold text-slate-200 tracking-wide transition-all outline-none"
                 />
-                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#bf0528] transition-colors" size={14} />
+                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors" size={14} />
               </div>
+
+              {onToggleNotifications && (
+                <button 
+                  type="button"
+                  onClick={onToggleNotifications}
+                  title="Notifications Drawer"
+                  className="relative p-3 bg-slate-900 border border-slate-800 text-slate-300 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
+                >
+                  <Bell size={20} className="group-hover:text-cyan-400 transition-colors" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-cyan-400 text-slate-950 font-black text-[10px] flex items-center justify-center rounded-full ring-2 ring-slate-950 animate-pulse">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+              )}
 
               {isAdmin && onOpenTelegram && (
                 <button 
                   type="button"
                   onClick={onOpenTelegram}
                   title="Telegram Bot Integration"
-                  className="relative p-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-sky-500 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
+                  className="relative p-3 bg-slate-900 border border-slate-800 text-sky-400 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
                 >
                   <Send size={20} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                   {telegramConfig?.enabled && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-slate-950 animate-pulse" />
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-slate-950 animate-pulse" />
                   )}
                 </button>
               )}
@@ -6003,7 +6038,7 @@ const TopHeader = ({
                 <button 
                   type="button"
                   onClick={onShowLogin}
-                  className="px-3.5 py-2.5 bg-[#dc143c] hover:bg-[#b01030] text-white rounded-2xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-500/20 transition-all hover:scale-105 shrink-0"
+                  className="px-3.5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-500/20 transition-all hover:scale-105 shrink-0"
                   title="Unlock Admin Mode with PIN 11226"
                 >
                   <Key size={15} /> <span className="hidden sm:inline font-black uppercase text-[10px] tracking-wider">Admin (11226)</span>
@@ -6012,11 +6047,11 @@ const TopHeader = ({
 
               <button 
                 onClick={onShowCart}
-                className="relative p-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-gray-700 dark:text-gray-300 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
+                className="relative p-3 bg-slate-900 border border-slate-800 text-slate-300 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
               >
-                <ShoppingCart size={20} className="group-hover:text-[#bf0528] transition-colors" />
+                <ShoppingCart size={20} className="group-hover:text-cyan-400 transition-colors" />
                 {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#bf0528] text-white text-[10px] font-black flex items-center justify-center rounded-full ring-4 ring-white dark:ring-slate-950 animate-in zoom-in duration-300">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-cyan-400 text-slate-950 text-[10px] font-black flex items-center justify-center rounded-full ring-2 ring-slate-950">
                     {cartCount}
                   </span>
                 )}
@@ -6026,20 +6061,16 @@ const TopHeader = ({
                 <div className="flex items-center gap-2 pl-2">
                   <button 
                     onClick={() => setActiveTab('me')}
-                    className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-transparent hover:border-[#bf0528] transition-all p-0.5 bg-gray-100 dark:bg-slate-800 shrink-0"
+                    className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-transparent hover:border-cyan-400 transition-all p-0.5 bg-slate-800 shrink-0"
                   >
                     {user.photoURL ? (
                       <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover rounded-[14px]" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-blue-500/10 text-blue-600 font-black">
+                      <div className="w-full h-full flex items-center justify-center bg-cyan-500/10 text-cyan-400 font-black">
                         {user.email?.[0].toUpperCase()}
                       </div>
                     )}
                   </button>
-                  <div className="hidden xl:block max-w-[100px]">
-                    <p className="text-xs font-black dark:text-white truncate leading-none mb-1">{user.displayName || 'Guest User'}</p>
-                    <button onClick={onLogout} className="text-[10px] font-bold text-red-500 hover:text-red-600 transition-colors block">LOGOUT</button>
-                  </div>
                 </div>
               )}
             </div>
@@ -6375,12 +6406,130 @@ function AppContent() {
     return localStorage.getItem('adminPassword') || '11226';
   });
   const [notifications, setNotifications] = useState<{id: number, text: string, type?: 'info' | 'success' | 'admin-order' | 'error', order?: PublicOrder}[]>([]);
+  const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
+  const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [staffUser, setStaffUser] = useState<Staff | null>(null);
   const [clientProfile, setClientProfile] = useState<any | null>(null);
   const [isMobileNavHidden, setIsMobileNavHidden] = useState(false);
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  const logAuditEvent = useCallback(async (
+    action: string,
+    category: 'AUTH' | 'FINANCE' | 'INVENTORY' | 'STAFF' | 'SETTINGS' | 'SYSTEM',
+    details: string,
+    metadata?: Record<string, any>
+  ) => {
+    try {
+      const newLogRef = doc(collection(db, 'audit_logs'));
+      const logData: AuditLog = {
+        id: newLogRef.id,
+        timestamp: new Date().toISOString(),
+        actorId: user?.uid || (isAdmin ? 'admin' : 'anonymous'),
+        actorName: user?.displayName || user?.email || (isAdmin ? 'Admin User' : 'Guest'),
+        actorRole: isAdmin ? 'ADMIN' : (staffUser ? 'STAFF' : 'CLIENT'),
+        action,
+        category,
+        details,
+        metadata: metadata || {}
+      };
+      await setDoc(newLogRef, logData);
+    } catch (err) {
+      console.error("Failed to write audit log:", err);
+    }
+  }, [user, isAdmin, staffUser]);
+
+  const handleSavePortfolioItem = async (item: Partial<PortfolioItem>) => {
+    const id = item.id || doc(collection(db, 'portfolio')).id;
+    const itemData = {
+      id,
+      title: item.title || 'Untitled Project',
+      category: item.category || 'CCTV Installation',
+      description: item.description || '',
+      clientName: item.clientName || 'Valued Client',
+      location: item.location || 'Dhaka',
+      completionDate: item.completionDate || new Date().toISOString().split('T')[0],
+      image: item.image || 'https://images.unsplash.com/photo-1558002038-1a2a4b9da8af?auto=format&fit=crop&q=80&w=400',
+      technologies: item.technologies || ['CCTV', 'IP Cameras'],
+      isPublished: item.isPublished ?? true,
+      createdAt: item.createdAt || new Date().toISOString()
+    };
+    await setDoc(doc(db, 'portfolio', id), itemData, { merge: true });
+    logAuditEvent('SAVE_PORTFOLIO_ITEM', 'SETTINGS', `Saved portfolio project: ${itemData.title}`, { id });
+  };
+
+  const handleDeletePortfolioItem = async (id: string) => {
+    await deleteDoc(doc(db, 'portfolio', id));
+    logAuditEvent('DELETE_PORTFOLIO_ITEM', 'SETTINGS', `Deleted portfolio project ID: ${id}`);
+  };
+
+  const handleCreateTicket = async (ticketData: Omit<SupportTicket, 'id' | 'ticketNumber' | 'createdAt' | 'updatedAt' | 'messages'>) => {
+    const newDocRef = doc(collection(db, 'tickets'));
+    const ticketId = newDocRef.id;
+    const ticketNumber = `TICK-${Math.floor(1000 + Math.random() * 9000)}`;
+    const fullTicket: SupportTicket = {
+      ...ticketData,
+      id: ticketId,
+      ticketNumber,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: []
+    };
+    await setDoc(newDocRef, fullTicket);
+    logAuditEvent('CREATE_SUPPORT_TICKET', 'SYSTEM', `Created support ticket ${ticketNumber}: ${ticketData.subject}`);
+  };
+
+  const handleAddTicketMessage = async (ticketId: string, messageText: string, isInternalNote = false) => {
+    const ticketRef = doc(db, 'tickets', ticketId);
+    const snap = await getDoc(ticketRef);
+    if (snap.exists()) {
+      const ticket = snap.data() as SupportTicket;
+      const newMessage: TicketMessage = {
+        id: `msg-${Date.now()}`,
+        senderId: user?.uid || (isAdmin ? 'admin' : 'staff'),
+        senderName: user?.displayName || user?.email || (isAdmin ? 'Admin' : 'Support Agent'),
+        senderRole: isAdmin ? 'admin' : (staffUser ? 'staff' : 'client'),
+        message: messageText,
+        timestamp: new Date().toISOString(),
+        isInternalNote
+      };
+      const updatedMessages = [...(ticket.messages || []), newMessage];
+      await updateDoc(ticketRef, {
+        messages: updatedMessages,
+        updatedAt: new Date().toISOString()
+      });
+      logAuditEvent('ADD_TICKET_MESSAGE', 'SYSTEM', `Added message to ticket ${ticket.ticketNumber}`);
+    }
+  };
+
+  const handleUpdateTicketStatus = async (ticketId: string, status: TicketStatus) => {
+    await updateDoc(doc(db, 'tickets', ticketId), {
+      status,
+      updatedAt: new Date().toISOString()
+    });
+    logAuditEvent('UPDATE_TICKET_STATUS', 'SYSTEM', `Updated ticket ${ticketId} status to ${status}`);
+  };
+
+  const handleMarkNotificationRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { read: true });
+    } catch {
+      setAppNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    }
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    setAppNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const handleClearAllNotifications = () => {
+    setAppNotifications([]);
+  };
 
   const handleLogout = () => {
     playSound('pop');
+    logAuditEvent('LOGOUT', 'AUTH', 'User signed out from application');
     auth.signOut();
     setIsVerified(false);
     localStorage.removeItem('admin_verified');
@@ -6402,6 +6551,39 @@ function AppContent() {
       const updatedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PublicOrder));
       setPublicOrders(updatedOrders);
     });
+
+    const unsubscribePortfolio = onSnapshot(collection(db, 'portfolio'), (snapshot) => {
+      const updated = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PortfolioItem));
+      setPortfolioItems(updated);
+    });
+
+    const unsubscribeTickets = onSnapshot(collection(db, 'tickets'), (snapshot) => {
+      const updated = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupportTicket));
+      setTickets(updated);
+    });
+
+    const unsubscribeNotifications = onSnapshot(
+      query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50)),
+      (snapshot) => {
+        const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
+        setAppNotifications(notifs);
+      },
+      (error) => {
+        // Catch unauthenticated permission error silently
+      }
+    );
+
+    let unsubscribeAuditLogs = () => {};
+    if (isAdmin) {
+      unsubscribeAuditLogs = onSnapshot(
+        query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(100)),
+        (snapshot) => {
+          const updated = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog));
+          setAuditLogs(updated);
+        },
+        (err) => {}
+      );
+    }
 
     // 2. Auth-Restricted Listeners
     let unsubscribeClients = () => {};
@@ -11456,6 +11638,8 @@ const MePage = ({
             customLogo={customLogo}
             onOpenTelegram={() => setShowTelegramModal(true)}
             telegramConfig={telegramConfig}
+            unreadCount={appNotifications.filter(n => !n.read).length}
+            onToggleNotifications={() => setIsNotificationDrawerOpen(prev => !prev)}
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -11485,6 +11669,15 @@ const MePage = ({
                 deleteAnyOrder={deleteAnyOrder}
               /> : <PublicStore products={products} sliderImages={sliderImages} offers={offers} formatCurrency={formatCurrency} addToCart={addToCart} setActiveTab={setActiveTab} setSelectedProduct={setSelectedProduct} productCategories={productCategories} />)}
               {activeTab === 'shop-view' && <PublicStore products={products} sliderImages={sliderImages} offers={offers} formatCurrency={formatCurrency} addToCart={addToCart} setActiveTab={setActiveTab} setSelectedProduct={setSelectedProduct} productCategories={productCategories} />}
+              {activeTab === 'portfolio' && (
+                <PortfolioManager 
+                  items={portfolioItems}
+                  onSaveItem={handleSavePortfolioItem}
+                  onDeleteItem={handleDeletePortfolioItem}
+                  isAdmin={isAdmin}
+                  addNotification={addNotification}
+                />
+              )}
               {activeTab === 'manage-services' && isAdmin && (
                 <ManageServices withPassword={withPassword} />
               )}
@@ -11563,8 +11756,21 @@ const MePage = ({
                 />
               )}
               {activeTab === 'warranty' && isAdmin && <WarrantyPage clients={clients} />}
-              {activeTab === 'support' && (
-                <SupportPage />
+              {(activeTab === 'tickets' || activeTab === 'support') && (
+                <SupportTicketSystem 
+                  tickets={tickets}
+                  onCreateTicket={handleCreateTicket}
+                  onAddMessage={handleAddTicketMessage}
+                  onUpdateStatus={handleUpdateTicketStatus}
+                  isAdmin={isAdmin}
+                  isStaff={!!staffUser}
+                  currentUserEmail={user?.email}
+                  currentUserName={user?.displayName || 'User'}
+                  addNotification={addNotification}
+                />
+              )}
+              {activeTab === 'audit-logs' && (
+                isAdmin ? <AuditLogViewer logs={auditLogs} /> : <div className="p-8 text-center text-slate-400">Admin access required.</div>
               )}
               {activeTab === 'alerts' && (
                 <EmptyPlaceholder 
@@ -11613,6 +11819,15 @@ const MePage = ({
         </div>
       </div>
     )}
+
+      <NotificationCenterDrawer
+        isOpen={isNotificationDrawerOpen}
+        onClose={() => setIsNotificationDrawerOpen(false)}
+        notifications={appNotifications}
+        onMarkAsRead={handleMarkNotificationRead}
+        onMarkAllAsRead={handleMarkAllNotificationsRead}
+        onClearAll={handleClearAllNotifications}
+      />
 
       {/* Cart Drawer is already added as a component above App */}
       <CartDrawer 
@@ -11688,7 +11903,8 @@ const MePage = ({
                  ]),
                  { id: 'bandwidth', icon: <Activity size={18} />, label: 'Network' },
                  { id: 'staff-tracking', icon: <Navigation size={18} />, label: 'Track' },
-                 { id: isAdmin ? 'warranty' : 'support', icon: <Headphones size={18} />, label: 'Help' },
+                 { id: 'tickets', icon: <Ticket size={18} />, label: 'Tickets' },
+                 { id: 'portfolio', icon: <Briefcase size={18} />, label: 'Projects' },
                  { id: 'me', icon: <User size={18} />, label: 'Account' },
                  { id: 'hide-nav', icon: <X size={18} />, label: 'Close' },
                ]}

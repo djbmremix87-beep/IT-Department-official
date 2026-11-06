@@ -45,7 +45,6 @@
       "properties": {
         "id": { "type": "string" },
         "amount": { "type": "number" },
-        "date": { "type": "string" },
         "category": { "type": "string" }
       }
     },
@@ -115,6 +114,56 @@
         "lng": { "type": "number" },
         "timestamp": { "type": "string" }
       }
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "Customer support requests and issue tickets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ticketNumber": { "type": "string" },
+        "subject": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "PortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "Showcase of completed IT and CCTV projects",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "isPublished": { "type": "boolean" },
+        "image": { "type": "string" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System event alerts and user notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Security and administrative operation logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actorName": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -127,6 +176,10 @@
     "/staff/{staffId}": { "schema": "Staff", "description": "Employee directory" },
     "/staff/{staffId}/history/{historyId}": { "schema": "LocationHistory", "description": "Location tracking points" },
     "/public_orders/{orderId}": { "schema": "Order", "description": "Incoming sales" },
+    "/tickets/{ticketId}": { "schema": "SupportTicket", "description": "Client support tickets" },
+    "/portfolio/{portfolioId}": { "schema": "PortfolioItem", "description": "Project showcases" },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "System notifications" },
+    "/audit_logs/{logId}": { "schema": "AuditLog", "description": "Administrative audit trail" },
     "/settings/global": { "schema": "object", "description": "Global config" },
     "/users/{userId}": { "schema": "object", "description": "Legacy user data" }
   }

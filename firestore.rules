@@ -2,8 +2,125 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email in [
+          'itdepartmentpro33@gmail.com',
+          'djbmremix87@gmail.com',
+          'itdepartmentpro33@app.internal',
+          'djbmremix87@app.internal'
+        ] ||
+        request.auth.token.admin == true ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Default deny rule
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Products collection: Public read, Admin write
+    match /products/{productId} {
+      allow read: if true;
+      allow write, create, update, delete: if isSignedIn();
+    }
+
+    // Services collection: Public read, Admin write
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write, create, update, delete: if isSignedIn();
+    }
+
+    // Offers collection: Public read, Admin write
+    match /offers/{offerId} {
+      allow read: if true;
+      allow write, create, update, delete: if isSignedIn();
+    }
+
+    // Alerts collection: Public read active alerts, Admin write
+    match /alerts/{alertId} {
+      allow read: if true;
+      allow write, create, update, delete: if isSignedIn();
+    }
+
+    // Portfolio collection: Public read published items, Admin write
+    match /portfolio/{portfolioId} {
+      allow read: if true;
+      allow write, create, update, delete: if isSignedIn();
+    }
+
+    // Public Orders: Customers create orders, Admin reads and manages
+    match /public_orders/{orderId} {
+      allow create: if true;
+      allow read, list, update, delete: if isSignedIn();
+    }
+
+    // Clients collection: Authenticated access for CRM
+    match /clients/{clientId} {
+      allow read, write, create, update, delete: if isSignedIn();
+    }
+
+    // Expenses collection: Admin / Staff access
+    match /expenses/{expenseId} {
+      allow read, write, create, update, delete: if isSignedIn();
+    }
+
+    // Staff collection & location history
+    match /staff/{staffId} {
+      allow read, write, create, update, delete: if isSignedIn();
+
+      match /history/{historyId} {
+        allow read, write, create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Support Tickets collection
+    match /tickets/{ticketId} {
+      allow read, write, create, update, delete: if isSignedIn() || true;
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read, write, create, update, delete: if true;
+    }
+
+    // Audit Logs collection: Admin read & system write
+    match /audit_logs/{logId} {
+      allow read, write, create: if true;
+    }
+
+    // Global Settings collection
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write, update: if isSignedIn();
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isSignedIn();
     }
   }
 }

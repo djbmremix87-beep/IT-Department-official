@@ -1,15 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Poppins:wght@300;400;500;600;700&display=swap');
 @import url('https://unpkg.com/boxicons@2.1.1/css/boxicons.min.css');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-poppins: "Poppins", sans-serif;
 
-  --color-orange-brand: #ff8c00;
-  --color-green-accent: #22c55e;
+  --color-navy-dark: #050b18;
+  --color-navy-card: #0b1739;
+  --color-navy-surface: #101e46;
+  --color-cyan-accent: #00f0ff;
+  --color-cyan-dark: #00b8c4;
 }
 
 @layer base {
