@@ -25,6 +25,14 @@ service cloud.firestore {
       );
     }
 
+    function isStaff() {
+      return isSignedIn() && (
+        isAdmin() ||
+        exists(/databases/$(database)/documents/staff_members/$(request.auth.uid)) ||
+        request.auth.token.staff == true
+      );
+    }
+
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128;
     }
@@ -37,6 +45,20 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isValidPublicOrder(data) {
+      return data.keys().hasAll(['customerName', 'customerPhone', 'total', 'items'])
+        && data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 100
+        && data.customerPhone is string && data.customerPhone.size() >= 6 && data.customerPhone.size() <= 30
+        && data.total is number && data.total >= 0 && data.total <= 10000000
+        && data.items is list && data.items.size() > 0 && data.items.size() <= 50;
+    }
+
+    function isValidSupportTicket(data) {
+      return data.keys().hasAll(['subject', 'category', 'description'])
+        && data.subject is string && data.subject.size() > 0 && data.subject.size() <= 200
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 5000;
+    }
+
     // Default deny rule
     match /{document=**} {
       allow read, write: if false;
@@ -45,82 +67,104 @@ service cloud.firestore {
     // Products collection: Public read, Admin write
     match /products/{productId} {
       allow read: if true;
-      allow write, create, update, delete: if isSignedIn();
+      allow write, create, update, delete: if isAdmin();
     }
 
     // Services collection: Public read, Admin write
     match /services/{serviceId} {
       allow read: if true;
-      allow write, create, update, delete: if isSignedIn();
+      allow write, create, update, delete: if isAdmin();
     }
 
     // Offers collection: Public read, Admin write
     match /offers/{offerId} {
       allow read: if true;
-      allow write, create, update, delete: if isSignedIn();
+      allow write, create, update, delete: if isAdmin();
     }
 
     // Alerts collection: Public read active alerts, Admin write
     match /alerts/{alertId} {
       allow read: if true;
-      allow write, create, update, delete: if isSignedIn();
+      allow write, create, update, delete: if isAdmin();
     }
 
-    // Portfolio collection: Public read published items, Admin write
+    // Portfolio collection: Public read, Admin write
     match /portfolio/{portfolioId} {
       allow read: if true;
-      allow write, create, update, delete: if isSignedIn();
+      allow write, create, update, delete: if isAdmin();
     }
 
-    // Public Orders: Customers create orders, Admin reads and manages
+    // Public Orders: Public can submit order with validation; Admins & Staff manage orders
     match /public_orders/{orderId} {
-      allow create: if true;
-      allow read, list, update, delete: if isSignedIn();
+      allow create: if isValidPublicOrder(incoming());
+      allow read, list: if isAdmin() || isStaff() || (isSignedIn() && existing().customerUid == request.auth.uid);
+      allow update, delete: if isAdmin() || isStaff();
     }
 
-    // Clients collection: Authenticated access for CRM
+    // Clients collection: Admin and Staff full access, Client can read own profile
     match /clients/{clientId} {
-      allow read, write, create, update, delete: if isSignedIn();
+      allow read: if isAdmin() || isStaff() || isOwner(clientId) || (isSignedIn() && existing().email == request.auth.token.email);
+      allow create, update, delete: if isAdmin() || isStaff();
     }
 
-    // Expenses collection: Admin / Staff access
+    // Expenses collection: Admin & Staff financial records
     match /expenses/{expenseId} {
-      allow read, write, create, update, delete: if isSignedIn();
+      allow read, write, create, update, delete: if isAdmin() || isStaff();
     }
 
-    // Staff collection & location history
+    // Staff collection & location history: Admin manage, Staff read/update own location
     match /staff/{staffId} {
-      allow read, write, create, update, delete: if isSignedIn();
+      allow read: if isAdmin() || isStaff() || isOwner(staffId);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || isOwner(staffId);
 
       match /history/{historyId} {
-        allow read, write, create, update, delete: if isSignedIn();
+        allow read: if isAdmin() || isOwner(staffId);
+        allow create: if isAdmin() || isOwner(staffId);
+        allow update, delete: if isAdmin();
       }
     }
 
     // Support Tickets collection
     match /tickets/{ticketId} {
-      allow read, write, create, update, delete: if isSignedIn() || true;
+      allow create: if isValidSupportTicket(incoming());
+      allow read: if isAdmin() || isStaff() || (isSignedIn() && existing().clientUid == request.auth.uid);
+      allow update: if isAdmin() || isStaff() || (isSignedIn() && existing().clientUid == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
-    // Notifications collection
+    // Notifications collection: Restricted to authenticated users/admins
     match /notifications/{notificationId} {
-      allow read, write, create, update, delete: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
-    // Audit Logs collection: Admin read & system write
+    // Audit Logs collection: Read by Admin; Create by authenticated users; Immutable
     match /audit_logs/{logId} {
-      allow read, write, create: if true;
+      allow read: if isAdmin();
+      allow create: if isSignedIn() || isAdmin();
+      allow update, delete: if false;
     }
 
-    // Global Settings collection
+    // Global Settings collection: Public read, Admin write
     match /settings/{settingId} {
       allow read: if true;
-      allow write, update: if isSignedIn();
+      allow write, update: if isAdmin();
     }
 
-    // Users collection
+    // Users collection: Strict ownership and admin management; Prevent privilege escalation
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isSignedIn();
+      allow read: if isOwner(userId) || isAdmin() || isStaff();
+      allow create: if isOwner(userId) && (!("role" in incoming()) || incoming().role == "user" || isAdmin());
+      allow update: if (isOwner(userId) && (!("role" in incoming()) || incoming().role == existing().role || isAdmin())) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Admins metadata collection
+    match /admins/{adminUid} {
+      allow read: if isSignedIn();
+      allow write, create, update, delete: if isAdmin();
     }
   }
 }

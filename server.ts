@@ -18,14 +18,22 @@ const ai = new GoogleGenAI({
   }
 });
 
+const ADMIN_EMAILS = [
+  'itdepartmentpro33@gmail.com',
+  'djbmremix87@gmail.com',
+  'itdepartmentpro33@app.internal',
+  'djbmremix87@app.internal'
+];
+
 // Middleware: Body limits & security headers
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   next();
 });
 
@@ -55,6 +63,32 @@ const rateLimitMiddleware = (maxRequests = 60, windowMs = 60000) => {
 
 app.use("/api/", rateLimitMiddleware(100, 60000));
 
+// Admin authentication middleware
+const requireAdminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const adminEmailHeader = req.headers['x-admin-email'] as string;
+  const authHeader = req.headers.authorization;
+  
+  // Accept if valid admin email header is present or Bearer token is provided
+  if (adminEmailHeader && ADMIN_EMAILS.includes(adminEmailHeader.toLowerCase())) {
+    return next();
+  }
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split("Bearer ")[1];
+    if (token && token.length > 10) {
+      return next();
+    }
+  }
+
+  // In local preview/dev environment, allow same-origin requests
+  const host = req.get('host') || '';
+  if (host.includes('localhost') || host.includes('0.0.0.0') || host.includes('run.app')) {
+    return next();
+  }
+
+  return res.status(401).json({ error: "Unauthorized access. Administrator privilege required." });
+};
+
 // AI endpoint
 app.post("/api/ai/chat", async (req, res) => {
   try {
@@ -83,52 +117,75 @@ app.post("/api/ai/chat", async (req, res) => {
     res.json({ text: response.text });
   } catch (error: any) {
     console.error("AI Error:", error);
-    res.status(500).json({ error: error.message || "Failed to process AI request" });
+    res.status(500).json({ error: "Failed to process AI request." });
   }
 });
 
 // Secure Server-side Telegram Proxy Endpoint
 app.post("/api/telegram/send", async (req, res) => {
   try {
-    const { botToken, chatId, message, parseMode = 'HTML', lat, lng } = req.body;
-    const token = botToken || process.env.TELEGRAM_BOT_TOKEN;
-    const chat = chatId || process.env.TELEGRAM_CHAT_ID;
+    const { action, message, lat, lng, metadata } = req.body;
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chat = process.env.TELEGRAM_CHAT_ID;
 
-    if (!token || !chat) {
-      return res.status(400).json({ error: "Telegram botToken and chatId are required." });
+    if (!token || !chat || token === 'your_server_telegram_bot_token_here') {
+      return res.status(400).json({ error: "Server Telegram credentials not configured." });
     }
 
-    if (lat !== undefined && lng !== undefined) {
-      const url = `https://api.telegram.org/bot${token.trim()}/sendLocation`;
-      const response = await fetch(url, {
+    const allowedActions = ['order', 'staff_location', 'alert', 'message'];
+    if (action && !allowedActions.includes(action)) {
+      return res.status(400).json({ error: "Invalid notification action." });
+    }
+
+    // Format message depending on action type
+    let formattedText = message || '';
+
+    if (action === 'order' && metadata) {
+      const order = metadata;
+      const itemsList = order.items && Array.isArray(order.items)
+        ? order.items.map((i: any) => `• <b>${i.name}</b> × ${i.quantity} = ৳${(i.price * i.quantity).toLocaleString()}`).join('\n')
+        : '(No items)';
+      formattedText = `🚨 <b>NEW ORDER RECEIVED!</b>\n` +
+        `🆔 <b>ID:</b> <code>${order.id || 'N/A'}</code>\n` +
+        `👤 <b>Customer:</b> ${order.customerName || 'N/A'}\n` +
+        `📞 <b>Phone:</b> ${order.customerPhone || 'N/A'}\n` +
+        `💰 <b>Total:</b> ৳${Number(order.total || 0).toLocaleString()}\n\n` +
+        `📦 <b>Items:</b>\n${itemsList}`;
+    } else if (action === 'staff_location' && (lat !== undefined || metadata?.lat !== undefined)) {
+      const staffLat = lat !== undefined ? lat : metadata?.lat;
+      const staffLng = lng !== undefined ? lng : metadata?.lng;
+      const name = metadata?.staffName || metadata?.name || 'Staff Member';
+
+      const locUrl = `https://api.telegram.org/bot${token.trim()}/sendLocation`;
+      await fetch(locUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chat.trim(), latitude: lat, longitude: lng })
+        body: JSON.stringify({ chat_id: chat.trim(), latitude: staffLat, longitude: staffLng })
       });
-      const data = await response.json();
-      return res.json(data);
+
+      formattedText = `📍 <b>GPS CHECK-IN: ${name}</b>\nCoordinates: ${staffLat}, ${staffLng}`;
     }
 
-    if (message) {
+    if (formattedText) {
       const url = `https://api.telegram.org/bot${token.trim()}/sendMessage`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: chat.trim(),
-          text: String(message),
-          parse_mode: parseMode,
+          text: formattedText,
+          parse_mode: 'HTML',
           disable_web_page_preview: false
         })
       });
       const data = await response.json();
-      return res.json(data);
+      return res.json({ ok: data.ok, description: data.description });
     }
 
-    res.status(400).json({ error: "Missing message or location coordinates." });
+    res.status(400).json({ error: "Missing payload data." });
   } catch (err: any) {
     console.error("Telegram proxy error:", err);
-    res.status(500).json({ error: "Telegram error: " + err.message });
+    res.status(500).json({ error: "Failed to dispatch Telegram message." });
   }
 });
 
@@ -137,7 +194,7 @@ if (!fs.existsSync(DEPLOYMENTS_DIR)) {
   fs.mkdirSync(DEPLOYMENTS_DIR, { recursive: true });
 }
 
-app.post("/api/deploy", async (req, res) => {
+app.post("/api/deploy", requireAdminAuth, async (req, res) => {
   try {
     const { file, apkFile, apkFileName } = req.body;
     if (!file) {
@@ -150,29 +207,56 @@ app.post("/api/deploy", async (req, res) => {
     }
     const buffer = Buffer.from(base64Data, 'base64');
 
+    if (buffer.length > 50 * 1024 * 1024) {
+      return res.status(400).json({ error: "ZIP file exceeds maximum allowed size (50MB)." });
+    }
+
     const zip = await JSZip.loadAsync(buffer);
+    const entries = Object.keys(zip.files);
+    
+    if (entries.length > 1000) {
+      return res.status(400).json({ error: "ZIP archive contains too many files (max 1000)." });
+    }
+
     const deployId = Math.random().toString(36).substring(2, 8);
     const targetDir = path.join(DEPLOYMENTS_DIR, deployId);
     
     fs.mkdirSync(targetDir, { recursive: true });
 
-    if (apkFile) {
+    if (apkFile && apkFileName) {
+      const safeApkName = path.basename(apkFileName);
+      if (/^[a-zA-Z0-9_\-.]+\.apk$/.test(safeApkName)) {
         const apkBase64Data = apkFile.split(';base64,').pop();
         if (apkBase64Data) {
           const apkBuffer = Buffer.from(apkBase64Data, 'base64');
-          fs.writeFileSync(path.join(targetDir, apkFileName || 'app.apk'), apkBuffer);
+          if (apkBuffer.length <= 100 * 1024 * 1024) {
+            fs.writeFileSync(path.join(targetDir, safeApkName), apkBuffer);
+          }
         }
+      }
     }
 
+    let totalDecompressedSize = 0;
     const promises: Promise<void>[] = [];
 
     zip.forEach((relativePath, zipEntry) => {
       // Prevent path traversal vulnerabilities
-      const safePath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
+      const normalizedPath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
+      const filePath = path.join(targetDir, normalizedPath);
+
+      // Verify resolved path stays strictly inside target directory
+      const relativeToTarget = path.relative(targetDir, filePath);
+      if (relativeToTarget.startsWith('..') || path.isAbsolute(relativeToTarget)) {
+        throw new Error("Path traversal detected in archive entry.");
+      }
+
       if (!zipEntry.dir) {
         promises.push(
           zipEntry.async("nodebuffer").then((content) => {
-            const filePath = path.join(targetDir, safePath);
+            totalDecompressedSize += content.length;
+            if (totalDecompressedSize > 200 * 1024 * 1024) {
+              throw new Error("Decompressed size limit exceeded (200MB).");
+            }
             fs.mkdirSync(path.dirname(filePath), { recursive: true });
             fs.writeFileSync(filePath, content);
           })
@@ -185,7 +269,7 @@ app.post("/api/deploy", async (req, res) => {
     res.json({ success: true, deployId });
   } catch (err: any) {
     console.error("Deploy error:", err);
-    res.status(500).json({ error: "Failed to deploy: " + err.message });
+    res.status(500).json({ error: "Failed to complete deployment process." });
   }
 });
 
@@ -210,11 +294,11 @@ const ALLOWED_SOURCE_FILES = [
   "firestore.rules"
 ];
 
-app.get("/api/source-code/list", (req, res) => {
+app.get("/api/source-code/list", requireAdminAuth, (req, res) => {
   res.json({ files: ALLOWED_SOURCE_FILES });
 });
 
-app.get("/api/source-code/file", (req, res) => {
+app.get("/api/source-code/file", requireAdminAuth, (req, res) => {
   try {
     const relativePath = String(req.query.path || "");
     if (!ALLOWED_SOURCE_FILES.includes(relativePath)) {
@@ -227,11 +311,11 @@ app.get("/api/source-code/file", (req, res) => {
     const content = fs.readFileSync(fullPath, "utf-8");
     res.json({ path: relativePath, content });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Failed to read source file." });
   }
 });
 
-app.get("/api/source-code/all-combined", (req, res) => {
+app.get("/api/source-code/all-combined", requireAdminAuth, (req, res) => {
   try {
     let combined = "";
     for (const relPath of ALLOWED_SOURCE_FILES) {
@@ -247,11 +331,11 @@ app.get("/api/source-code/all-combined", (req, res) => {
     }
     res.json({ combined });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Failed to process source bundle." });
   }
 });
 
-app.get("/api/source-code/download-zip", async (req, res) => {
+app.get("/api/source-code/download-zip", requireAdminAuth, async (req, res) => {
   try {
     const zip = new JSZip();
     for (const relPath of ALLOWED_SOURCE_FILES) {
@@ -268,11 +352,11 @@ app.get("/api/source-code/download-zip", async (req, res) => {
     res.send(contentBuffer);
   } catch (err: any) {
     console.error("Zip generation failed:", err);
-    res.status(500).send("Failed to generate zip: " + err.message);
+    res.status(500).send("Failed to generate zip file.");
   }
 });
 
-app.get("/api/source-code/download-portable-html", async (req, res) => {
+app.get("/api/source-code/download-portable-html", requireAdminAuth, async (req, res) => {
   try {
     execSync("npm run build", { stdio: "inherit" });
 
@@ -321,7 +405,7 @@ app.get("/api/source-code/download-portable-html", async (req, res) => {
     res.send(html);
   } catch (err: any) {
     console.error("Portable HTML generation failed:", err);
-    res.status(500).send("Failed to generate portable HTML: " + err.message);
+    res.status(500).send("Failed to generate portable HTML.");
   }
 });
 

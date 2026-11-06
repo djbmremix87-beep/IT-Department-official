@@ -6038,10 +6038,10 @@ const TopHeader = ({
                 <button 
                   type="button"
                   onClick={onShowLogin}
-                  className="px-3.5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-500/20 transition-all hover:scale-105 shrink-0"
-                  title="Unlock Admin Mode with PIN 11226"
+                  className="px-3.5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-2xl font-black text-xs flex items-center gap-1.5 shadow-md transition-all hover:scale-105 shrink-0"
+                  title="Administrator Authentication"
                 >
-                  <Key size={15} /> <span className="hidden sm:inline font-black uppercase text-[10px] tracking-wider">Admin (11226)</span>
+                  <ShieldCheck size={16} /> <span className="hidden sm:inline font-black uppercase text-[10px] tracking-wider">Admin Sign In</span>
                 </button>
               )}
 
@@ -6343,11 +6343,7 @@ function AppContent() {
     'itdepartmentpro33@app.internal',
     'djbmremix87@app.internal'
   ];
-  const [isVerified, setIsVerified] = useState(() => {
-    return localStorage.getItem('admin_verified') === 'true';
-  });
-  const isEmailAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
-  const isAdmin = isVerified || isEmailAdmin;
+  const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
 
   // Removed automatic redirection to shop-view for admins to avoid confusion
   useEffect(() => {
@@ -6402,9 +6398,7 @@ function AppContent() {
       console.error("Failed to sync telegram config to Firestore:", err);
     }
   };
-  const [adminPassword, setAdminPassword] = useState(() => {
-    return localStorage.getItem('adminPassword') || '11226';
-  });
+  const [adminPassword, setAdminPassword] = useState('');
   const [notifications, setNotifications] = useState<{id: number, text: string, type?: 'info' | 'success' | 'admin-order' | 'error', order?: PublicOrder}[]>([]);
   const [appNotifications, setAppNotifications] = useState<AppNotification[]>([]);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
@@ -6531,8 +6525,6 @@ function AppContent() {
     playSound('pop');
     logAuditEvent('LOGOUT', 'AUTH', 'User signed out from application');
     auth.signOut();
-    setIsVerified(false);
-    localStorage.removeItem('admin_verified');
     setStaffUser(null);
     setClientProfile(null);
     setActiveTab('dashboard');
@@ -6709,7 +6701,7 @@ function AppContent() {
   }, [publicOrders, isAdmin, isInitialLoad]);
 
   const withPassword = (action: () => void, strict = false) => {
-    if (isAdmin || isVerified) {
+    if (isAdmin) {
       action();
       return;
     }
@@ -6717,17 +6709,14 @@ function AppContent() {
     setShowPasswordModal(true);
     setPasswordCallback({ 
       onSuccess: () => {
-        setIsVerified(true);
-        localStorage.setItem('admin_verified', 'true');
         action();
       } 
     });
   };
 
   const lockAdmin = () => {
-    setIsVerified(false);
-    localStorage.removeItem('admin_verified');
-    addNotification("Admin session locked.");
+    auth.signOut();
+    addNotification("Admin session signed out.");
   };
   const [productCategories, setProductCategories] = useState<CategoryData[]>(() => {
     const saved = localStorage.getItem('cctv_product_categories');
@@ -8634,23 +8623,57 @@ function AppContent() {
 
 
   const PasswordModal = ({ onClose }: { onClose: () => void }) => {
-    const [input, setInput] = useState('');
-    const [error, setError] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [errorMsg, setErrorMsg] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const val = input.trim();
-      if (val === adminPassword || val === '11226') {
-        setIsVerified(true);
-        localStorage.setItem('admin_verified', 'true');
-        setShowPasswordModal(false);
-        if (passwordCallback) {
-          passwordCallback.onSuccess();
-          setPasswordCallback(null);
+    const handleGoogleAuth = async () => {
+      setLoading(true);
+      setErrorMsg('');
+      try {
+        const res = await loginWithGoogle();
+        if (res && res.user && res.user.email) {
+          if (adminEmails.includes(res.user.email.toLowerCase())) {
+            setShowPasswordModal(false);
+            addNotification("Admin Google Authentication successful!");
+            if (passwordCallback) {
+              passwordCallback.onSuccess();
+              setPasswordCallback(null);
+            }
+          } else {
+            setErrorMsg(`Signed in as ${res.user.email}, but account is not in Admin list.`);
+          }
         }
-      } else {
-        setError(true);
-        setTimeout(() => setError(false), 500);
+      } catch (err: any) {
+        setErrorMsg(err?.message || "Google Authentication failed.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleEmailAuth = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setErrorMsg('');
+      try {
+        const res = await loginWithEmail(email, password);
+        if (res && res.user && res.user.email) {
+          if (adminEmails.includes(res.user.email.toLowerCase())) {
+            setShowPasswordModal(false);
+            addNotification("Admin Email Authentication successful!");
+            if (passwordCallback) {
+              passwordCallback.onSuccess();
+              setPasswordCallback(null);
+            }
+          } else {
+            setErrorMsg(`Signed in as ${res.user.email}, but account is not in Admin list.`);
+          }
+        }
+      } catch (err: any) {
+        setErrorMsg("Invalid admin credentials or account not authorized.");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -8666,53 +8689,70 @@ function AppContent() {
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className={cn(
-            "glow-effect-container text-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl ",
-            error && "animate-shake"
-          )}
+          className="bg-slate-900 border border-cyan-500/30 text-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl p-8"
           onClick={e => e.stopPropagation()}
         >
-          <div className="p-8 text-center">
-            <div className="w-20 h-20 bg-[#dc143c] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-red-500/20">
-              <Key size={40} className="text-white" />
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-cyan-500/20 text-cyan-400 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-cyan-500/30">
+              <ShieldCheck size={36} />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Admin PIN Access</h3>
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-8">
-              অ্যাডমিন প্যানেল আনলক করতে পিন কোড <span className="font-bold text-[#dc143c]">11226</span> লিখুন।
-            </p>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                <input 
-                  autoFocus
-                  type="password"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="11226"
-                  className={cn(
-                    "w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-[#dc143c] rounded-2xl py-4 pl-12 pr-4 outline-none transition-all font-bold text-center tracking-[0.5em]",
-                    error ? "border-red-500 text-red-500" : "text-slate-900 dark:text-white"
-                  )}
-                />
-              </div>
-              
-              <div className="flex gap-3">
+            <h3 className="text-xl font-black text-white">Administrator Authentication</h3>
+            <p className="text-xs text-slate-400 mt-1">Sign in with an authorized Firebase Administrator account</p>
+          </div>
+
+          {errorMsg && (
+            <div className="mb-4 p-3 bg-red-900/30 border border-red-500/40 rounded-xl text-red-400 text-xs text-center font-bold">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <button
+              onClick={handleGoogleAuth}
+              disabled={loading}
+              className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-all shadow-md"
+            >
+              <LogIn size={18} className="text-cyan-400" />
+              <span>Sign in with Google</span>
+            </button>
+
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-slate-800" />
+              <span className="text-[10px] uppercase font-bold text-slate-500">OR EMAIL LOGIN</span>
+              <div className="flex-1 h-px bg-slate-800" />
+            </div>
+
+            <form onSubmit={handleEmailAuth} className="space-y-3">
+              <input 
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="Admin Email (e.g. djbmremix87@gmail.com)"
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-cyan-400"
+              />
+              <input 
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Password"
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-cyan-400"
+              />
+              <div className="flex gap-2 pt-2">
                 <button 
                   type="button"
-                  onClick={() => {
-                    setShowPasswordModal(false);
-                    setPasswordCallback(null);
-                  }}
-                  className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-xs"
+                  onClick={onClose}
+                  className="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-700"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="flex-[2] py-4 bg-[#dc143c] hover:bg-[#b01030] text-white rounded-2xl font-bold shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] text-xs uppercase tracking-wider"
+                  disabled={loading}
+                  className="flex-[2] py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                 >
-                  Unlock Admin (11226)
+                  {loading ? 'Authenticating...' : 'Sign In as Admin'}
                 </button>
               </div>
             </form>
@@ -9795,16 +9835,14 @@ const BandwidthTestPage = () => {
                   setShowPasswordModal(true);
                   setPasswordCallback({
                     onSuccess: () => {
-                      setIsVerified(true);
-                      localStorage.setItem('admin_verified', 'true');
-                      addNotification("অ্যাডমিন প্যানেল সফলভাবে আনলক হয়েছে! (PIN 11226)");
+                      addNotification("Administrator signed in successfully.");
                       setActiveTab('dashboard');
                     }
                   });
                 }}
-                className="w-full py-3 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white rounded-xl flex items-center justify-center gap-2 transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-red-600/20 mb-3"
+                className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black rounded-xl flex items-center justify-center gap-2 transition-all text-xs uppercase tracking-widest shadow-lg mb-3"
               >
-                <Key size={16} /> Admin Login via PIN (11226)
+                <ShieldCheck size={18} /> Administrator Sign In
               </button>
 
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-3">Or continue with</p>
@@ -11629,7 +11667,7 @@ const MePage = ({
             onLogout={handleLogout}
             onShowLogin={() => {
               withPassword(() => {
-                addNotification("অ্যাডমিন প্যানেল সফলভাবে আনলক হয়েছে! (PIN 11226)");
+                addNotification("Administrator signed in.");
                 setActiveTab('dashboard');
               });
             }}
@@ -11912,7 +11950,7 @@ const MePage = ({
                  if (id === 'hide-nav') setIsMobileNavHidden(true);
                  else if (id === 'admin-unlock') {
                    withPassword(() => {
-                     addNotification("অ্যাডমিন প্যানেল সফলভাবে আনলক হয়েছে! (PIN 11226)");
+                     addNotification("Administrator signed in.");
                      setActiveTab('dashboard');
                    });
                  } else setActiveTab(id as any);
