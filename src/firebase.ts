@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -8,32 +8,57 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
-// Use initializeFirestore to enable specific settings like long polling and offline persistence
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
-}, firebaseConfig.firestoreDatabaseId);
-
-// Validate Connection to Firestore on boot
-async function testConnection() {
-  try {
-    // Attempting to fetch a non-existent document to check connectivity
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Firestore connection failed: the client is offline. Please check your network or Firebase configuration.");
-    } else {
-      console.log("Firestore connection test completed (ignoring non-offline errors)");
-    }
-  }
-}
-testConnection();
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 const provider = new GoogleAuthProvider();
 
-export const loginWithGoogle = () => signInWithPopup(auth, provider);
-export const loginWithEmail = (email: string, pass: string) => signInWithEmailAndPassword(auth, email, pass);
-export const registerWithEmail = (email: string, pass: string) => createUserWithEmailAndPassword(auth, email, pass);
+export const loginWithGoogle = async () => {
+  try {
+    return await signInWithPopup(auth, provider);
+  } catch (error: any) {
+    if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+      console.info("Google Sign-In popup was closed or cancelled by the user.");
+      return null;
+    }
+    if (error?.code === 'auth/popup-blocked') {
+      alert("Sign-in popup was blocked by your browser. Please allow popups for this site and try again.");
+      return null;
+    }
+    if (error?.code === 'auth/operation-not-allowed') {
+      console.warn("Google Sign-In is not enabled in the Firebase Console.");
+      alert("Google Sign-In is not enabled in Firebase Console. Please enable Google Auth in your Firebase Project console.");
+      return null;
+    }
+    throw error;
+  }
+};
+
+export const loginWithEmail = async (email: string, pass: string) => {
+  try {
+    return await signInWithEmailAndPassword(auth, email, pass);
+  } catch (error: any) {
+    if (error?.code === 'auth/operation-not-allowed') {
+      console.warn("Email/Password Sign-In is not enabled in the Firebase Console.");
+      alert("Email/Password Sign-In is not enabled in Firebase Console.");
+      return null;
+    }
+    throw error;
+  }
+};
+
+export const registerWithEmail = async (email: string, pass: string) => {
+  try {
+    return await createUserWithEmailAndPassword(auth, email, pass);
+  } catch (error: any) {
+    if (error?.code === 'auth/operation-not-allowed') {
+      console.warn("Email/Password registration is not enabled in the Firebase Console.");
+      alert("Email/Password registration is not enabled in Firebase Console.");
+      return null;
+    }
+    throw error;
+  }
+};
+
 export const logout = () => signOut(auth);
 
 export enum OperationType {

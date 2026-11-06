@@ -33,11 +33,23 @@ import {
   OperationType 
 } from './firebase';
 
+import { QRPaymentModal } from './components/QRPaymentModal';
+import { TelegramModal } from './components/TelegramModal';
+import { 
+  getDefaultTelegramConfig, 
+  saveTelegramConfig, 
+  sendOrderNotification, 
+  sendStaffLocationNotification, 
+  sendSystemAlertNotification, 
+  TelegramConfig 
+} from './lib/telegram';
+
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
   Code,
   Copy,
+  QrCode,
   LayoutDashboard, 
   Users, 
   Package, 
@@ -419,106 +431,111 @@ const ProductPastaCard = ({
 
   return (
     <div 
-      className="group relative h-full flex flex-col cursor-pointer bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-[20px] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] overflow-hidden"
+      className="group neon-hover-card relative h-full flex flex-col cursor-pointer bg-white dark:bg-slate-900 border border-cyan-500/20 dark:border-cyan-400/25 rounded-[20px] transition-all duration-300 overflow-hidden"
       onClick={() => (onSelect ? onSelect(product) : (onEdit ? onEdit(product) : null))}
     >
-      {/* Badge Overlay */}
-      {product.badge && (
-        <div className="absolute top-4 left-4 z-20">
-          <span className="px-3 py-1 bg-[#bf0528]/95 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-wider rounded-full shadow-md">
-            {product.badge}
-          </span>
-        </div>
-      )}
-
-      {/* Image Container with Soft Shading */}
-      <div className="w-full aspect-square relative bg-slate-50 dark:bg-slate-950/60 flex items-center justify-center p-6 select-none overflow-hidden border-b border-gray-50 dark:border-slate-900">
-        {product.image ? (
-          <img 
-            src={product.image} 
-            alt={product.name} 
-            className="w-4/5 h-4/5 object-contain relative z-10 transition-transform duration-700 group-hover:scale-105" 
-            referrerPolicy="no-referrer"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://placehold.co/400x300/f1f5f9/475569?text=${encodeURIComponent(product.name || 'Product')}`;
-            }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-700">
-            <Package size={48} strokeWidth={1} />
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Badge Overlay */}
+        {product.badge && (
+          <div className="absolute top-4 left-4 z-20">
+            <span className="px-3 py-1 bg-[#bf0528]/95 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-wider rounded-full shadow-md">
+              {product.badge}
+            </span>
           </div>
         )}
-        
-        {/* Quick Purchase Hover Bar */}
-        <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm flex items-center justify-center z-20 border-t border-gray-100 dark:border-slate-800">
-          <button 
-            className="w-full py-2 bg-[#bf0528] hover:bg-red-800 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (addToCart) {
-                addToCart(product);
-              } else {
-                // Trigger global cart addition if not directly passed
-                const ev = new CustomEvent('add-product-to-cart', { detail: product });
-                window.dispatchEvent(ev);
-              }
-            }}
-          >
-            <ShoppingCart size={11} />
-            Quick Purchase
-          </button>
-        </div>
-      </div>
 
-      {/* Content Section */}
-      <div className="p-4 sm:p-5 flex flex-col flex-1 select-none">
-        {/* Category Label */}
-        <span className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 select-none">
-          {product.category || 'Surveillance'}
-        </span>
-
-        {/* Title */}
-        <h4 className="text-xs sm:text-sm font-black text-slate-800 dark:text-gray-100 uppercase tracking-tight line-clamp-1 group-hover:text-[#bf0528] transition-colors mb-2">
-          {product.name}
-        </h4>
-
-        {/* Brand Rating Row */}
-        <div className="flex items-center gap-1.5 mb-4">
-          <div className="flex text-amber-400 text-xs tracking-tighter">
-            <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
-          </div>
-          <span className="text-[10px] text-gray-400 font-bold dark:text-slate-500">({reviewCount})</span>
-        </div>
-
-        {/* Price Row at the bottom */}
-        <div className="mt-auto flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <span className="text-slate-900 dark:text-white font-black text-base tracking-tight text-[15px]">
-              {formatCurrency(product.price)}
-            </span>
-            {product.oldPrice || true ? (
-              <span className="text-[10px] text-gray-400 dark:text-slate-500 line-through">
-                {formatCurrency(product.oldPrice || (product.price * 1.15))}
-              </span>
-            ) : null}
-          </div>
-
-          {isAdmin && onEdit && onDelete && (
-            <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-              <button 
-                onClick={() => onEdit(product)} 
-                className="p-1 px-2.5 bg-slate-50 dark:bg-slate-800 text-slate-500 hover:text-[#bf0528] rounded-lg transition-colors text-[9px] font-black uppercase tracking-wider"
-              >
-                Edit
-              </button>
-              <button 
-                onClick={() => onDelete(product.id)} 
-                className="p-1 px-2.5 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-600 rounded-lg transition-colors text-[9px] font-black uppercase tracking-wider"
-              >
-                Del
-              </button>
+        {/* Image Container with Soft Shading and Ambient Neon Glow */}
+        <div className="w-full aspect-square relative bg-slate-50 dark:bg-slate-950/60 flex items-center justify-center p-6 select-none overflow-hidden border-b border-gray-50 dark:border-slate-900">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,240,255,0.08)_0%,_transparent_70%)] dark:bg-[radial-gradient(circle_at_center,_rgba(0,240,255,0.12)_0%,_transparent_70%)] pointer-events-none group-hover:scale-125 transition-transform duration-700" />
+          {product.image ? (
+            <img 
+              src={product.image} 
+              alt={product.name} 
+              loading="lazy"
+              decoding="async"
+              className="w-4/5 h-4/5 object-contain relative z-10 transition-transform duration-500 group-hover:scale-105" 
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = `https://placehold.co/400x300/f1f5f9/475569?text=${encodeURIComponent(product.name || 'Product')}`;
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-300 dark:text-slate-700">
+              <Package size={48} strokeWidth={1} />
             </div>
           )}
+          
+          {/* Quick Purchase Hover Bar */}
+          <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm flex items-center justify-center z-20 border-t border-gray-100 dark:border-slate-800">
+            <button 
+              className="w-full py-2 bg-[#bf0528] hover:bg-red-800 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (addToCart) {
+                  addToCart(product);
+                } else {
+                  // Trigger global cart addition if not directly passed
+                  const ev = new CustomEvent('add-product-to-cart', { detail: product });
+                  window.dispatchEvent(ev);
+                }
+              }}
+            >
+              <ShoppingCart size={11} />
+              Quick Purchase
+            </button>
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="p-4 sm:p-5 flex flex-col flex-1 select-none">
+          {/* Category Label */}
+          <span className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1 select-none">
+            {product.category || 'Surveillance'}
+          </span>
+
+          {/* Title */}
+          <h4 className="text-xs sm:text-sm font-black text-slate-800 dark:text-gray-100 uppercase tracking-tight line-clamp-1 group-hover:text-[#bf0528] transition-colors mb-2">
+            {product.name}
+          </h4>
+
+          {/* Brand Rating Row */}
+          <div className="flex items-center gap-1.5 mb-4">
+            <div className="flex text-amber-400 text-xs tracking-tighter">
+              <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+            </div>
+            <span className="text-[10px] text-gray-400 font-bold dark:text-slate-500">({reviewCount})</span>
+          </div>
+
+          {/* Price Row at the bottom */}
+          <div className="mt-auto flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-slate-900 dark:text-white font-black text-base tracking-tight text-[15px]">
+                {formatCurrency(product.price)}
+              </span>
+              {product.oldPrice || true ? (
+                <span className="text-[10px] text-gray-400 dark:text-slate-500 line-through">
+                  {formatCurrency(product.oldPrice || (product.price * 1.15))}
+                </span>
+              ) : null}
+            </div>
+
+            {isAdmin && onEdit && onDelete && (
+              <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                <button 
+                  onClick={() => onEdit(product)} 
+                  className="p-1 px-2.5 bg-slate-50 dark:bg-slate-800 text-slate-500 hover:text-[#bf0528] rounded-lg transition-colors text-[9px] font-black uppercase tracking-wider"
+                >
+                  Edit
+                </button>
+                <button 
+                  onClick={() => onDelete(product.id)} 
+                  className="p-1 px-2.5 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-600 rounded-lg transition-colors text-[9px] font-black uppercase tracking-wider"
+                >
+                  Del
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -2540,12 +2557,8 @@ const ProductList = ({
       <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-2 sm:px-4 pb-12">
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product, idx) => (
-            <motion.div 
+            <div 
               key={`${product.id}-${idx}`}
-              initial={{ opacity: 0, y: 30, scale: 0.8 }}
-              whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ delay: (idx % 6) * 0.05 }}
               className="h-full"
             >
               <ProductPastaCard 
@@ -2555,7 +2568,7 @@ const ProductList = ({
                 onEdit={onEditProduct}
                 onDelete={handleDeleteProduct}
               />
-            </motion.div>
+            </div>
           ))
         ) : (
           <div className="col-span-2 py-20 text-center flex flex-col items-center justify-center gap-4 text-gray-400">
@@ -2818,7 +2831,7 @@ const AdminDashboard = ({
               {[
                 ...publicOrders.map(o => ({ ...o, clientName: o.customerName, type: 'Public' })),
                 ...clients.flatMap(c => (c.orders || []).map(o => ({ ...o, clientName: c.name, type: 'CRM', clientId: c.id })))
-              ].sort((a,b) => b.id.localeCompare(a.id)).slice(0, 12).map((order, idx) => (
+              ].sort((a,b) => String(b.id || '').localeCompare(String(a.id || ''))).slice(0, 12).map((order, idx) => (
                 <tr key={`${order.id}-${order.type}-${idx}`} className="group hover:bg-gray-50 dark:hover:bg-slate-800/10 transition-colors">
                   <td className="py-5 font-mono text-[10px] font-bold text-blue-600 dark:text-emerald-400">{order.id}</td>
                   <td className="py-5 text-xs font-bold text-slate-900 dark:text-white capitalize">{order.clientName}</td>
@@ -3155,36 +3168,38 @@ const PublicStore = ({
           <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-4 -mx-4 px-4">
             {products.slice(0, 6).map((product, i) => (
               <motion.div 
-                key={`${product.id}-${i}`}
+                key={`flash-${product.id}-${i}`}
                 initial={{ opacity: 0, x: 50, scale: 0.8 }}
                 whileInView={{ opacity: 1, x: 0, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
                 onClick={() => setSelectedProduct(product)}
-                className="min-w-[180px] rounded-2xl p-3 cursor-pointer group glow-effect-container text-white"
+                className="min-w-[180px] rounded-2xl p-3 cursor-pointer group neon-hover-card text-white bg-slate-900 border border-cyan-500/20"
               >
-                <div className="h-44 rounded-xl mb-3 overflow-hidden relative bg-png flex items-center justify-center">
-                  {product.image ? (
-                    <img 
-                      src={product.image} 
-                      alt={product.name} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://placehold.co/400x400/07182e/ffffff?text=${encodeURIComponent(product.name || 'Product')}`;
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500">
-                      <Package size={32} />
-                    </div>
-                  )}
-                  <div className="absolute top-2 left-2 bg-orange-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase shadow-lg">Save 15%</div>
-                </div>
-                <h4 className="text-[11px] font-black line-clamp-1 mb-1 uppercase tracking-tight group-hover:text-orange-400 transition-colors">{product.name}</h4>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-orange-500 font-black text-sm italic">{formatCurrency(product.price)}</span>
-                  <span className="text-gray-500 text-[9px] line-through">{formatCurrency(product.price * 1.15)}</span>
+                <div className="relative z-10 flex flex-col h-full">
+                  <div className="h-44 rounded-xl mb-3 overflow-hidden relative bg-png flex items-center justify-center">
+                    {product.image ? (
+                      <img 
+                        src={product.image} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://placehold.co/400x400/07182e/ffffff?text=${encodeURIComponent(product.name || 'Product')}`;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500">
+                        <Package size={32} />
+                      </div>
+                    )}
+                    <div className="absolute top-2 left-2 bg-orange-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase shadow-lg">Save 15%</div>
+                  </div>
+                  <h4 className="text-[11px] font-black line-clamp-1 mb-1 uppercase tracking-tight group-hover:text-orange-400 transition-colors">{product.name}</h4>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-orange-500 font-black text-sm italic">{formatCurrency(product.price)}</span>
+                    <span className="text-gray-500 text-[9px] line-through">{formatCurrency(product.price * 1.15)}</span>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -3202,12 +3217,8 @@ const PublicStore = ({
       <div className="grid grid-cols-2 gap-2 px-1 py-4 min-h-[400px]">
         {filteredProducts.length > 0 ? (
           filteredProducts.map((product, i) => (
-            <motion.div 
-              key={`${product.id}-${i}`}
-              initial={{ opacity: 0, y: 30, scale: 0.8 }}
-              whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ delay: (i % 6) * 0.1 }}
+            <div 
+              key={`grid-${product.id}-${i}`}
               className="h-full"
             >
               <ProductPastaCard 
@@ -3215,7 +3226,7 @@ const PublicStore = ({
                 onSelect={setSelectedProduct}
                 addToCart={addToCart}
               />
-            </motion.div>
+            </div>
           ))
         ) : (
           <div className="col-span-2 py-20 text-center flex flex-col items-center justify-center gap-4 text-white/40">
@@ -3586,8 +3597,20 @@ const ManageServices = ({ withPassword }: { withPassword: (action: () => void) =
   );
 };
 
-const StaffTrackingMap = ({ staff }: { staff: Staff[] }) => {
+const StaffTrackingMap = ({ 
+  staff,
+  telegramConfig,
+  onOpenTelegram,
+  addNotification
+}: { 
+  staff: Staff[];
+  telegramConfig?: TelegramConfig;
+  onOpenTelegram?: () => void;
+  addNotification?: (msg: string, type?: any) => void;
+}) => {
   const center: [number, number] = [23.8103, 90.4125]; // Default and fallback to Dhaka
+  const [sendingStaffId, setSendingStaffId] = useState<string | null>(null);
+  const [sendingAll, setSendingAll] = useState(false);
   
   // Custom component to handle bounds and centering
   const ChangeView = ({ staff }: { staff: Staff[] }) => {
@@ -3602,8 +3625,68 @@ const StaffTrackingMap = ({ staff }: { staff: Staff[] }) => {
     return null;
   };
 
+  const handleSendSingleToTelegram = async (member: Staff) => {
+    if (!member.lastKnownLocation) {
+      if (addNotification) addNotification(`${member.name}-এর কোনো লোকেশন পাওয়া যায়নি`, 'error');
+      return;
+    }
+    setSendingStaffId(member.id);
+    const res = await sendStaffLocationNotification(member, telegramConfig);
+    setSendingStaffId(null);
+    if (res.success) {
+      if (addNotification) addNotification(`📍 ${member.name}-এর লোকেশন টেলিগ্রামে পাঠানো হয়েছে!`, 'success');
+    } else {
+      if (addNotification) addNotification(`টেলিগ্রাম এরর: ${res.error || 'টেলিগ্রাম বট কনফিগারেশন চেক করুন'}`, 'error');
+      if (onOpenTelegram) onOpenTelegram();
+    }
+  };
+
+  const handleSendAllToTelegram = async () => {
+    const activeStaff = staff.filter(s => s.lastKnownLocation);
+    if (activeStaff.length === 0) {
+      if (addNotification) addNotification("বর্তমানে কোনো স্টাফের সক্রিয় লোকেশন নেই", 'info');
+      return;
+    }
+    setSendingAll(true);
+    let count = 0;
+    for (const member of activeStaff) {
+      const res = await sendStaffLocationNotification(member, telegramConfig);
+      if (res.success) count++;
+    }
+    setSendingAll(false);
+    if (count > 0) {
+      if (addNotification) addNotification(`📍 ${count} জন স্টাফের লাইভ লোকেশন টেলিগ্রামে পাঠানো হয়েছে!`, 'success');
+    } else {
+      if (addNotification) addNotification("টেলিগ্রামে পাঠাতে সমস্যা হয়েছে। বট টোকেন ও চ্যাট আইডি চেক করুন।", 'error');
+      if (onOpenTelegram) onOpenTelegram();
+    }
+  };
+
   return (
-    <div className="h-[500px] w-full rounded-3xl overflow-hidden shadow-2xl relative z-0 border-4 border-white dark:border-slate-800">
+    <div className="h-[520px] w-full rounded-3xl overflow-hidden shadow-2xl relative z-0 border-4 border-white dark:border-slate-800">
+      {/* Telegram Live Broadcast Bar */}
+      <div className="absolute top-3 right-3 z-[1000] flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleSendAllToTelegram}
+          disabled={sendingAll}
+          className="px-3.5 py-2 bg-sky-600/95 hover:bg-sky-500 text-white rounded-2xl text-xs font-black shadow-xl flex items-center gap-2 backdrop-blur-md transition-all active:scale-95 border border-sky-400/30 disabled:opacity-50"
+        >
+          {sendingAll ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
+          <span>টেলিগ্রামে লোকেশন পাঠান</span>
+        </button>
+        {onOpenTelegram && (
+          <button
+            type="button"
+            onClick={onOpenTelegram}
+            title="Telegram Settings"
+            className="p-2 bg-white/90 dark:bg-slate-900/90 hover:bg-white text-sky-600 dark:text-sky-400 rounded-2xl text-xs font-bold shadow-xl border border-slate-200 dark:border-slate-700 backdrop-blur-md transition-all"
+          >
+            <Settings size={15} />
+          </button>
+        )}
+      </div>
+
       <MapContainer center={center} zoom={12} style={{ height: '100%', width: '100%' }}>
         <ChangeView staff={staff} />
         <TileLayer
@@ -3621,7 +3704,7 @@ const StaffTrackingMap = ({ staff }: { staff: Staff[] }) => {
               </div>
             </LeafletTooltip>
             <Popup>
-              <div className="p-1 min-w-[180px]">
+              <div className="p-1 min-w-[200px]">
                 <div className="flex items-center gap-2 mb-2 border-b pb-2">
                   <div className="w-10 h-10 rounded-full bg-[#dc143c] flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden shadow-inner">
                     {member.image ? (
@@ -3650,6 +3733,16 @@ const StaffTrackingMap = ({ staff }: { staff: Staff[] }) => {
                       <Navigation size={10} /> Lat: {member.lastKnownLocation!.lat.toFixed(4)}, Lng: {member.lastKnownLocation!.lng.toFixed(4)}
                     </div>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendSingleToTelegram(member)}
+                    disabled={sendingStaffId === member.id}
+                    className="w-full mt-2 py-2 px-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                  >
+                    {sendingStaffId === member.id ? <RefreshCw size={11} className="animate-spin" /> : <Send size={11} />}
+                    <span>Send Live Location to Telegram</span>
+                  </button>
                 </div>
               </div>
             </Popup>
@@ -3749,7 +3842,17 @@ const StaffFlipCard = ({
   );
 };
 
-const ManageStaff = ({ withPassword, addNotification }: { withPassword: (action: () => void) => void, addNotification: (text: string) => void }) => {
+const ManageStaff = ({ 
+  withPassword, 
+  addNotification, 
+  telegramConfig, 
+  onOpenTelegram 
+}: { 
+  withPassword: (action: () => void) => void, 
+  addNotification: (text: string, type?: any) => void,
+  telegramConfig?: TelegramConfig,
+  onOpenTelegram?: () => void
+}) => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -3960,29 +4063,65 @@ const ManageStaff = ({ withPassword, addNotification }: { withPassword: (action:
 
       {activeView === 'map' ? (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-          <StaffTrackingMap staff={filteredStaff} />
+          <StaffTrackingMap 
+            staff={filteredStaff} 
+            telegramConfig={telegramConfig}
+            onOpenTelegram={onOpenTelegram}
+            addNotification={addNotification}
+          />
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {filteredStaff.map((member, idx) => (
-              <div key={`${member.id}-${idx}`} className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                <div className="relative shrink-0">
-                  {member.image ? (
-                    <img src={member.image} className="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-slate-800 shadow-sm" alt={member.name} />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[#dc143c] font-bold border-2 border-white dark:border-slate-800 shadow-sm">
-                      {member.name.charAt(0)}
-                    </div>
-                  )}
-                  <div className={cn(
-                    "absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900",
-                    getStatusColor(member)
-                  )} />
+              <div key={`${member.id}-${idx}`} className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative shrink-0">
+                    {member.image ? (
+                      <img src={member.image} className="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-slate-800 shadow-sm" alt={member.name} />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[#dc143c] font-bold border-2 border-white dark:border-slate-800 shadow-sm">
+                        {member.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className={cn(
+                      "absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900",
+                      getStatusColor(member)
+                    )} />
+                  </div>
+                  <div className="overflow-hidden">
+                    <h4 className="font-bold text-sm truncate">{member.name}</h4>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      {getStatusLabel(member)}
+                    </p>
+                  </div>
                 </div>
-                <div className="overflow-hidden">
-                  <h4 className="font-bold text-sm truncate">{member.name}</h4>
-                  <p className="text-[10px] text-gray-400 truncate">
-                    {getStatusLabel(member)}
-                  </p>
-                </div>
+                {member.lastKnownLocation && (
+                  <button
+                    onClick={async () => {
+                      if (!telegramConfig?.botToken || !telegramConfig?.chatId) {
+                        onOpenTelegram?.();
+                        addNotification("প্রথমে টেলিগ্রাম বট কনফিগার করুন!");
+                        return;
+                      }
+                      const res = await sendStaffLocationNotification({
+                        staffName: member.name,
+                        role: member.role,
+                        phone: member.phone,
+                        lat: member.lastKnownLocation!.lat,
+                        lng: member.lastKnownLocation!.lng,
+                        address: member.lastKnownLocation!.address,
+                        updatedAt: member.lastKnownLocation!.updatedAt
+                      }, telegramConfig);
+                      if (res.success) {
+                        addNotification(`Telegram-এ ${member.name}-এর লাইভ লোকেশন পাঠানো হয়েছে!`);
+                      } else {
+                        addNotification("টেলিগ্রামে পাঠাতে ব্যর্থ: " + res.error);
+                      }
+                    }}
+                    className="p-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/40 dark:hover:bg-sky-900/50 text-sky-500 transition-colors shrink-0 border border-sky-200/50 dark:border-sky-800/50"
+                    title="Send location to Telegram"
+                  >
+                    <Send size={15} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -4158,13 +4297,22 @@ const ManageStaff = ({ withPassword, addNotification }: { withPassword: (action:
   );
 };
 
-const StaffCheckIn = ({ user, staffUser }: { user: FirebaseUser | null, staffUser: Staff | null }) => {
+const StaffCheckIn = ({ 
+  user, 
+  staffUser, 
+  telegramConfig 
+}: { 
+  user: FirebaseUser | null, 
+  staffUser: Staff | null,
+  telegramConfig?: TelegramConfig 
+}) => {
   const [staffInfo, setStaffInfo] = useState<Staff | null>(staffUser);
   const [tracking, setTracking] = useState(true);
   const [lastCheckIn, setLastCheckIn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSendingTelegram, setIsSendingTelegram] = useState(false);
   const watchId = useRef<number | null>(null);
   const wakeLock = useRef<any>(null);
 
@@ -4175,6 +4323,38 @@ const StaffCheckIn = ({ user, staffUser }: { user: FirebaseUser | null, staffUse
       }
     } catch (err) {
       console.error('Wake Lock failed:', err);
+    }
+  };
+
+  const handleSendTelegramLocation = async () => {
+    if (!staffInfo?.lastKnownLocation) {
+      setError("এখনো লোকেশন পাওয়া যায়নি, একটু অপেক্ষা করুন বা GPS চালু আছে কিনা নিশ্চিত করুন।");
+      setTimeout(() => setError(null), 4000);
+      return;
+    }
+    setIsSendingTelegram(true);
+    try {
+      const res = await sendStaffLocationNotification({
+        staffName: staffInfo.name,
+        role: staffInfo.role,
+        phone: staffInfo.phone,
+        lat: staffInfo.lastKnownLocation.lat,
+        lng: staffInfo.lastKnownLocation.lng,
+        address: staffInfo.lastKnownLocation.address,
+        updatedAt: staffInfo.lastKnownLocation.updatedAt
+      }, telegramConfig);
+      if (res.success) {
+        setSuccess("টেলিগ্রাম বটে আপনার লাইভ লোকেশন সফলভাবে পাঠানো হয়েছে!");
+        setTimeout(() => setSuccess(null), 4000);
+      } else {
+        setError("টেলিগ্রামে পাঠাতে সমস্যা: " + (res.error || 'Please check Telegram config in admin panel'));
+        setTimeout(() => setError(null), 4000);
+      }
+    } catch (e: any) {
+      setError(e.message || "Failed to send");
+      setTimeout(() => setError(null), 4000);
+    } finally {
+      setIsSendingTelegram(false);
     }
   };
 
@@ -4203,6 +4383,19 @@ const StaffCheckIn = ({ user, staffUser }: { user: FirebaseUser | null, staffUse
       });
       setSuccess("Attendance submitted successfully!");
       setTimeout(() => setSuccess(null), 3000);
+
+      // Auto-send attendance & location to Telegram if available
+      if (staffInfo.lastKnownLocation) {
+        sendStaffLocationNotification({
+          staffName: staffInfo.name,
+          role: staffInfo.role,
+          phone: staffInfo.phone,
+          lat: staffInfo.lastKnownLocation.lat,
+          lng: staffInfo.lastKnownLocation.lng,
+          address: staffInfo.lastKnownLocation.address,
+          updatedAt: now.toISOString()
+        }, telegramConfig).catch(() => {});
+      }
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, 'staff');
     }
@@ -4451,7 +4644,7 @@ const StaffCheckIn = ({ user, staffUser }: { user: FirebaseUser | null, staffUse
             <div className="p-5 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
                <h4 className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold mb-3"><DollarSign size={16} /> Salary History</h4>
                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                 {[...staffInfo.salaries].sort((a, b) => b.id.localeCompare(a.id)).map((salary, idx) => (
+                 {[...staffInfo.salaries].sort((a, b) => String(b.id || '').localeCompare(String(a.id || ''))).map((salary, idx) => (
                    <div key={`${salary.id}-${idx}`} className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-emerald-100/50 dark:border-emerald-800/30">
                      <div className="flex justify-between items-center mb-2 border-b border-slate-100 dark:border-slate-700 pb-2">
                        <span className="font-bold text-slate-700 dark:text-slate-200">{salary.monthName}</span>
@@ -4496,6 +4689,16 @@ const StaffCheckIn = ({ user, staffUser }: { user: FirebaseUser | null, staffUse
                 : !!staffInfo.attendance?.[new Date().toISOString().split('T')[0]])
               ? 'Attendance Given Today' : 'Give Daily Attendance (হাজিরা দিন)'
             }
+          </button>
+
+          <button 
+            type="button"
+            onClick={handleSendTelegramLocation}
+            disabled={isSendingTelegram}
+            className="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-sky-500/20 active:scale-[0.99] disabled:opacity-50"
+          >
+            <Send size={18} className={cn(isSendingTelegram && "animate-spin")} />
+            {isSendingTelegram ? 'টেলিগ্রামে পাঠানো হচ্ছে...' : 'অ্যাডমিনের টেলিগ্রামে লাইভ লোকেশন পাঠান'}
           </button>
 
           {success && (
@@ -5509,21 +5712,21 @@ const SplashScreen = ({ customLogo, onEnter, onPlay, hasMusic, isLoading }: { cu
   useEffect(() => {
     if (!started) return;
 
+    const startTime = Date.now();
     const interval = setInterval(() => {
       setProgress(prev => {
-        if (prev >= 100) {
+        const elapsed = Date.now() - startTime;
+        // Maximum 850ms so visitors immediately see the store without freezing
+        if (prev >= 100 || elapsed >= 850) {
           clearInterval(interval);
-          setTimeout(onEnter, 100);
+          setTimeout(onEnter, 50);
           return 100;
         }
-        if (prev >= 95 && isLoading) {
-          return 95;
-        }
-        return prev + Math.random() * 40;
+        return prev + 25;
       });
-    }, 50);
+    }, 40);
     return () => clearInterval(interval);
-  }, [started, onEnter, isLoading]);
+  }, [started, onEnter]);
 
   return (
     <motion.div 
@@ -5671,7 +5874,9 @@ const TopHeader = ({
   onShowLogin,
   activeTab,
   setActiveTab,
-  customLogo
+  customLogo,
+  onOpenTelegram,
+  telegramConfig
 }: { 
   user: any, 
   isAdmin: boolean, 
@@ -5681,7 +5886,9 @@ const TopHeader = ({
   onShowLogin: () => void,
   activeTab: string,
   setActiveTab: (t: string) => void,
-  customLogo: string | null
+  customLogo: string | null,
+  onOpenTelegram?: () => void,
+  telegramConfig?: TelegramConfig
 }) => {
   return (
     <div className="w-full flex flex-col z-[60] sticky top-0 shadow-sm select-none">
@@ -5778,6 +5985,31 @@ const TopHeader = ({
                 <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#bf0528] transition-colors" size={14} />
               </div>
 
+              {isAdmin && onOpenTelegram && (
+                <button 
+                  type="button"
+                  onClick={onOpenTelegram}
+                  title="Telegram Bot Integration"
+                  className="relative p-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-sky-500 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
+                >
+                  <Send size={20} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  {telegramConfig?.enabled && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-slate-950 animate-pulse" />
+                  )}
+                </button>
+              )}
+
+              {!isAdmin && (
+                <button 
+                  type="button"
+                  onClick={onShowLogin}
+                  className="px-3.5 py-2.5 bg-[#dc143c] hover:bg-[#b01030] text-white rounded-2xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-500/20 transition-all hover:scale-105 shrink-0"
+                  title="Unlock Admin Mode with PIN 11226"
+                >
+                  <Key size={15} /> <span className="hidden sm:inline font-black uppercase text-[10px] tracking-wider">Admin (11226)</span>
+                </button>
+              )}
+
               <button 
                 onClick={onShowCart}
                 className="relative p-3 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 text-gray-700 dark:text-gray-300 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-sm group"
@@ -5790,7 +6022,7 @@ const TopHeader = ({
                 )}
               </button>
 
-              {user ? (
+              {user && (
                 <div className="flex items-center gap-2 pl-2">
                   <button 
                     onClick={() => setActiveTab('me')}
@@ -5809,13 +6041,6 @@ const TopHeader = ({
                     <button onClick={onLogout} className="text-[10px] font-bold text-red-500 hover:text-red-600 transition-colors block">LOGOUT</button>
                   </div>
                 </div>
-              ) : (
-                <button 
-                  onClick={onShowLogin}
-                  className="px-6 py-2.5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl text-xs font-black tracking-widest hover:scale-105 active:scale-95 transition-all shrink-0"
-                >
-                  SIGN IN
-                </button>
               )}
             </div>
           </div>
@@ -6087,7 +6312,11 @@ function AppContent() {
     'itdepartmentpro33@app.internal',
     'djbmremix87@app.internal'
   ];
-  const isAdmin = user?.email && adminEmails.includes(user.email.toLowerCase());
+  const [isVerified, setIsVerified] = useState(() => {
+    return localStorage.getItem('admin_verified') === 'true';
+  });
+  const isEmailAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
+  const isAdmin = isVerified || isEmailAdmin;
 
   // Removed automatic redirection to shop-view for admins to avoid confusion
   useEffect(() => {
@@ -6121,9 +6350,29 @@ function AppContent() {
   const [showCalculator, setShowCalculator] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordCallback, setPasswordCallback] = useState<{ onSuccess: () => void } | null>(null);
-  const [isVerified, setIsVerified] = useState(false);
+  const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>(getDefaultTelegramConfig);
+  const [showTelegramModal, setShowTelegramModal] = useState(false);
+
+  // Safety boot timer so link opens in < 1s without hanging
+  useEffect(() => {
+    const safety = setTimeout(() => {
+      setIsInitialLoad(false);
+    }, 900);
+    return () => clearTimeout(safety);
+  }, []);
+
+  const handleSaveTelegramConfig = async (newConfig: TelegramConfig) => {
+    setTelegramConfig(newConfig);
+    saveTelegramConfig(newConfig);
+    try {
+      const userDocRef = doc(db, 'settings', 'global');
+      await setDoc(userDocRef, { telegramConfig: newConfig }, { merge: true });
+    } catch (err) {
+      console.error("Failed to sync telegram config to Firestore:", err);
+    }
+  };
   const [adminPassword, setAdminPassword] = useState(() => {
-    return localStorage.getItem('adminPassword') || '1233@';
+    return localStorage.getItem('adminPassword') || '11226';
   });
   const [notifications, setNotifications] = useState<{id: number, text: string, type?: 'info' | 'success' | 'admin-order' | 'error', order?: PublicOrder}[]>([]);
   const [staffUser, setStaffUser] = useState<Staff | null>(null);
@@ -6133,6 +6382,8 @@ function AppContent() {
   const handleLogout = () => {
     playSound('pop');
     auth.signOut();
+    setIsVerified(false);
+    localStorage.removeItem('admin_verified');
     setStaffUser(null);
     setClientProfile(null);
     setActiveTab('dashboard');
@@ -6208,7 +6459,7 @@ function AppContent() {
             // Notification for recently paid salary
             const salaries = data.salaries || [];
             if (salaries.length > 0) {
-              const latestSalary = [...salaries].sort((a, b) => b.id.localeCompare(a.id))[0];
+              const latestSalary = [...salaries].sort((a, b) => String(b.id || '').localeCompare(String(a.id || '')))[0];
               const paidAt = new Date(latestSalary.paidAt).getTime();
               if (Date.now() - paidAt < 3 * 24 * 60 * 60 * 1000) {
                 setTimeout(() => addNotification(`🎉 Salary Paid: BDT ${latestSalary.totalPaid} for ${latestSalary.monthName}.`), 2000);
@@ -6276,14 +6527,8 @@ function AppContent() {
   }, [publicOrders, isAdmin, isInitialLoad]);
 
   const withPassword = (action: () => void, strict = false) => {
-    // If strict is false and user is logged in via Firebase, they are the admin
-    if (!strict && (isAdmin || isVerified)) {
+    if (isAdmin || isVerified) {
       action();
-      return;
-    }
-    
-    if (strict && !isAdmin) {
-      addNotification("Only the owner can perform this action. Please log in.");
       return;
     }
 
@@ -6291,6 +6536,7 @@ function AppContent() {
     setPasswordCallback({ 
       onSuccess: () => {
         setIsVerified(true);
+        localStorage.setItem('admin_verified', 'true');
         action();
       } 
     });
@@ -6298,6 +6544,7 @@ function AppContent() {
 
   const lockAdmin = () => {
     setIsVerified(false);
+    localStorage.removeItem('admin_verified');
     addNotification("Admin session locked.");
   };
   const [productCategories, setProductCategories] = useState<CategoryData[]>(() => {
@@ -6467,6 +6714,10 @@ function AppContent() {
           lastSyncedSettings.current.offersMusic = data.offersMusic;
           if (data.offersMusic) localStorage.setItem('cctv_offers_music', data.offersMusic);
           else localStorage.removeItem('cctv_offers_music');
+        }
+        if (data.telegramConfig !== undefined) {
+          setTelegramConfig(data.telegramConfig);
+          saveTelegramConfig(data.telegramConfig);
         }
         
         // Seed if not already seeded and user is logged in
@@ -6795,7 +7046,22 @@ function AppContent() {
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, duration);
-  }, []);
+
+    // Automatic Telegram Alert Dispatch
+    try {
+      if (order) {
+        sendOrderNotification(order, telegramConfig).catch(() => {});
+      } else if (
+        type === 'admin-order' || 
+        text.toLowerCase().includes('low stock') || 
+        text.toLowerCase().includes('alert')
+      ) {
+        sendSystemAlertNotification(type === 'admin-order' ? 'New Order' : 'System Alert', text, telegramConfig).catch(() => {});
+      }
+    } catch (e) {
+      console.warn("Telegram notification dispatch error:", e);
+    }
+  }, [telegramConfig]);
 
   // --- Logic Functions ---
 
@@ -7096,6 +7362,8 @@ function AppContent() {
       try {
         await setDoc(doc(db, 'public_orders', orderId), publicOrder);
         console.log("Public order saved successfully");
+        // Immediate Telegram Order Notification Dispatch
+        sendOrderNotification(publicOrder, telegramConfig).catch(e => console.warn("Telegram order notification failed:", e));
       } catch (orderErr) {
         console.error("Order save failed:", orderErr);
         handleFirestoreError(orderErr, OperationType.WRITE, `public_orders/${orderId}`);
@@ -8189,7 +8457,10 @@ function AppContent() {
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (input === adminPassword) {
+      const val = input.trim();
+      if (val === adminPassword || val === '11226') {
+        setIsVerified(true);
+        localStorage.setItem('admin_verified', 'true');
         setShowPasswordModal(false);
         if (passwordCallback) {
           passwordCallback.onSuccess();
@@ -8220,12 +8491,12 @@ function AppContent() {
           onClick={e => e.stopPropagation()}
         >
           <div className="p-8 text-center">
-            <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-500/20">
-              <Lock size={40} className="text-white" />
+            <div className="w-20 h-20 bg-[#dc143c] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-red-500/20">
+              <Key size={40} className="text-white" />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Security Check</h3>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Admin PIN Access</h3>
             <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-8">
-              Please enter the administrative password to continue with this action.
+              অ্যাডমিন প্যানেল আনলক করতে পিন কোড <span className="font-bold text-[#dc143c]">11226</span> লিখুন।
             </p>
             
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -8236,9 +8507,9 @@ function AppContent() {
                   type="password"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Enter Password"
+                  placeholder="11226"
                   className={cn(
-                    "w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-orange-500 dark:focus:border-emerald-500 rounded-2xl py-4 pl-12 pr-4 outline-none transition-all font-bold text-center tracking-[0.5em]",
+                    "w-full bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-[#dc143c] rounded-2xl py-4 pl-12 pr-4 outline-none transition-all font-bold text-center tracking-[0.5em]",
                     error ? "border-red-500 text-red-500" : "text-slate-900 dark:text-white"
                   )}
                 />
@@ -8251,15 +8522,15 @@ function AppContent() {
                     setShowPasswordModal(false);
                     setPasswordCallback(null);
                   }}
-                  className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                  className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-xs"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="flex-[2] py-4 glow-effect-container text-white rounded-2xl font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02]"
+                  className="flex-[2] py-4 bg-[#dc143c] hover:bg-[#b01030] text-white rounded-2xl font-bold shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] text-xs uppercase tracking-wider"
                 >
-                  Verify
+                  Unlock Admin (11226)
                 </button>
               </div>
             </form>
@@ -8421,6 +8692,7 @@ const PaymentGateway = ({ amount, onComplete, onClose }: { amount: number, onCom
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerAddress, setCustomerAddress] = useState('');
     const [showGateway, setShowGateway] = useState(false);
+    const [showQRPaymentModal, setShowQRPaymentModal] = useState(false);
     const [isOrdering, setIsOrdering] = useState(false);
 
     const handleDigitalPayment = (type: 'Bkash' | 'Nagad') => {
@@ -8432,6 +8704,23 @@ const PaymentGateway = ({ amount, onComplete, onClose }: { amount: number, onCom
             await placeOrder(orderClientId, true, type as any);
           } else {
             await placePublicOrder({ name: customerName, phone: customerPhone, address: customerAddress }, true, type as any);
+          }
+        } finally {
+          setIsOrdering(false);
+        }
+      }, 500);
+    };
+
+    const handleQRPaymentConfirm = async (trxId: string, method: string) => {
+      setShowQRPaymentModal(false);
+      setIsOrdering(true);
+      const qrPaymentMethod = `QR (${method}) - TrxID: ${trxId}`;
+      setTimeout(async () => {
+        try {
+          if (isAdmin && orderClientId) {
+            await placeOrder(orderClientId, true, qrPaymentMethod as any);
+          } else {
+            await placePublicOrder({ name: customerName, phone: customerPhone, address: customerAddress }, true, qrPaymentMethod);
           }
         } finally {
           setIsOrdering(false);
@@ -8477,6 +8766,16 @@ const PaymentGateway = ({ amount, onComplete, onClose }: { amount: number, onCom
               amount={total} 
               onClose={() => setShowGateway(false)} 
               onComplete={handleDigitalPayment} 
+            />
+          )}
+          {showQRPaymentModal && (
+            <QRPaymentModal
+              amount={total}
+              customerName={isAdmin ? (clients.find(c => c.id === orderClientId)?.name || customerName) : customerName}
+              customerPhone={isAdmin ? (clients.find(c => c.id === orderClientId)?.phone || customerPhone) : customerPhone}
+              onClose={() => setShowQRPaymentModal(false)}
+              onConfirmPayment={handleQRPaymentConfirm}
+              formatCurrency={formatCurrency}
             />
           )}
         </AnimatePresence>
@@ -8712,8 +9011,22 @@ const PaymentGateway = ({ amount, onComplete, onClose }: { amount: number, onCom
                       ? (!customerName || !customerPhone || !customerAddress || isOrdering)
                       : (!orderClientId || isOrdering)
                   }
+                  onClick={() => setShowQRPaymentModal(true)}
+                  className="w-full py-4.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-[24px] font-black text-sm shadow-xl shadow-indigo-950/30 flex items-center justify-center gap-2.5 transition-all border border-blue-400/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <QrCode size={20} className="text-emerald-300 animate-pulse" />
+                  <span>Pay via QR Code (bKash / Nagad / Bank)</span>
+                </motion.button>
+
+                <motion.button 
+                  whileTap={{ scale: 0.98 }}
+                  disabled={
+                    (!isAdmin || !orderClientId) 
+                      ? (!customerName || !customerPhone || !customerAddress || isOrdering)
+                      : (!orderClientId || isOrdering)
+                  }
                   onClick={() => setShowGateway(true)}
-                  className="w-full py-5 glow-effect-container text-white rounded-[24px] font-black text-sm shadow-xl flex items-center justify-center gap-2 relative overflow-hidden"
+                  className="w-full py-4 glow-effect-container text-white/90 rounded-[24px] font-bold text-xs shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
                 >
                   {isOrdering ? (
                      <div className="flex items-center gap-2">
@@ -8728,8 +9041,8 @@ const PaymentGateway = ({ amount, onComplete, onClose }: { amount: number, onCom
                      </div>
                   ) : (
                     <>
-                      <CreditCard size={20} />
-                      {(!isAdmin || !orderClientId) ? "Pay Now (Bkash/Nagad)" : "Digital Payment (Bkash/Nagad)"}
+                      <CreditCard size={18} />
+                      {(!isAdmin || !orderClientId) ? "Alternative Direct PIN Gateway" : "Digital Payment Gateway"}
                     </>
                   )}
                 </motion.button>
@@ -9185,12 +9498,14 @@ const BandwidthTestPage = () => {
       try {
         await onLogin();
       } catch (err: any) {
+        if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
+          console.info("Google sign-in popup closed by user.");
+          return;
+        }
         console.error("Google Login Error:", err);
         const isIframe = window.self !== window.top;
         if (isIframe && (err.code === 'auth/popup-blocked' || err.code === 'auth/internal-error')) {
           addNotification("Google Login blocked. Please open this app in a NEW TAB to login securely.", "error");
-        } else if (err.code === 'auth/popup-closed-by-user') {
-          addNotification("Login cancelled. Please don't close the popup window.", "info");
         } else {
           addNotification(err.message || "Google Login failed", "error");
         }
@@ -9292,6 +9607,24 @@ const BandwidthTestPage = () => {
               transition={{ delay: 0.8 }}
               className="text-center mt-6 pt-4 border-t border-white/5"
             >
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowPasswordModal(true);
+                  setPasswordCallback({
+                    onSuccess: () => {
+                      setIsVerified(true);
+                      localStorage.setItem('admin_verified', 'true');
+                      addNotification("অ্যাডমিন প্যানেল সফলভাবে আনলক হয়েছে! (PIN 11226)");
+                      setActiveTab('dashboard');
+                    }
+                  });
+                }}
+                className="w-full py-3 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white rounded-xl flex items-center justify-center gap-2 transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-red-600/20 mb-3"
+              >
+                <Key size={16} /> Admin Login via PIN (11226)
+              </button>
+
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-3">Or continue with</p>
               <button 
                 type="button"
@@ -10217,7 +10550,7 @@ const MePage = ({
             <div className="space-y-4">
               {clientData.paymentHistory && clientData.paymentHistory.length > 0 ? (
                 clientData.paymentHistory.map((payment: any, idx: number) => (
-                  <div key={payment.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between">
+                  <div key={`${payment.id}-${idx}`} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between">
                     <div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{payment.type}</p>
                       <h4 className="font-bold text-green-600">+{formatCurrency(payment.amount)}</h4>
@@ -10247,7 +10580,7 @@ const MePage = ({
             <div className="space-y-4">
               {clientData?.orders && clientData.orders.length > 0 ? (
                 clientData.orders.map((order: any, idx: number) => (
-                  <div key={order.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between group">
+                  <div key={`${order.id}-${idx}`} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between group">
                     <div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Order #{order.id}</p>
                       <h4 className="font-bold text-slate-900 dark:text-white">{formatCurrency(order.total)}</h4>
@@ -10700,6 +11033,13 @@ const MePage = ({
                       <RefreshCcw size={16} /> Backup
                     </button>
                     <button 
+                      type="button"
+                      onClick={() => setShowTelegramModal(true)}
+                      className="p-3 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/40 hover:dark:bg-sky-900/50 text-sky-600 dark:text-sky-400 rounded-xl flex items-center gap-2 text-xs font-bold col-span-2 justify-center border border-sky-200/50 dark:border-sky-800/50 transition-colors shadow-sm"
+                    >
+                      <Send size={16} className="text-sky-500" /> Telegram Bot Settings (অর্ডার ও স্টাফ লাইভ নোটিফিকেশন)
+                    </button>
+                    <button 
                       onClick={() => withPassword(() => setShowCodeExplorer(true))}
                       className="p-3 bg-blue-50 hover:bg-blue-100 dark:bg-slate-800/80 hover:dark:bg-slate-800 text-blue-600 dark:text-blue-400 rounded-xl flex items-center gap-2 text-xs font-bold col-span-2 justify-center border border-blue-100/50 dark:border-slate-700/50 transition-colors shadow-sm"
                     >
@@ -11105,15 +11445,22 @@ const MePage = ({
             cartCount={cart.reduce((s, i) => s + i.quantity, 0)}
             onShowCart={() => setShowCart(true)}
             onLogout={handleLogout}
-            onShowLogin={() => setShowPasswordModal(true)}
+            onShowLogin={() => {
+              withPassword(() => {
+                addNotification("অ্যাডমিন প্যানেল সফলভাবে আনলক হয়েছে! (PIN 11226)");
+                setActiveTab('dashboard');
+              });
+            }}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             customLogo={customLogo}
+            onOpenTelegram={() => setShowTelegramModal(true)}
+            telegramConfig={telegramConfig}
           />
 
           <div className="flex-1 flex overflow-hidden">
             <main className={cn(
-              "flex-1 overflow-y-auto custom-scrollbar h-[calc(100vh-80px)] transition-all duration-300"
+              "flex-1 overflow-y-auto custom-scrollbar h-[calc(100vh-80px)] overscroll-y-contain [transform:translateZ(0)]"
             )}>
               <div className={cn(
                 "w-full h-full pb-28",
@@ -11205,10 +11552,15 @@ const MePage = ({
                 <BandwidthTestPage />
               )}
               {activeTab === 'staff-tracking' && (
-                <StaffCheckIn user={user} staffUser={staffUser} />
+                <StaffCheckIn user={user} staffUser={staffUser} telegramConfig={telegramConfig} />
               )}
               {activeTab === 'manage-staff' && isAdmin && (
-                <ManageStaff withPassword={withPassword} addNotification={addNotification} />
+                <ManageStaff 
+                  withPassword={withPassword} 
+                  addNotification={addNotification} 
+                  telegramConfig={telegramConfig}
+                  onOpenTelegram={() => setShowTelegramModal(true)}
+                />
               )}
               {activeTab === 'warranty' && isAdmin && <WarrantyPage clients={clients} />}
               {activeTab === 'support' && (
@@ -11331,7 +11683,9 @@ const MePage = ({
                    { id: 'expenses', icon: <Wallet size={18} />, label: 'Finance' },
                    { id: 'manage-staff', icon: <ShieldCheck size={18} />, label: 'Staff' },
                    { id: 'manage-services', icon: <Wrench size={18} />, label: 'Services' },
-                 ] : []),
+                 ] : [
+                   { id: 'admin-unlock', icon: <Key size={18} />, label: 'Admin PIN' },
+                 ]),
                  { id: 'bandwidth', icon: <Activity size={18} />, label: 'Network' },
                  { id: 'staff-tracking', icon: <Navigation size={18} />, label: 'Track' },
                  { id: isAdmin ? 'warranty' : 'support', icon: <Headphones size={18} />, label: 'Help' },
@@ -11340,7 +11694,12 @@ const MePage = ({
                ]}
                onSelect={(id) => {
                  if (id === 'hide-nav') setIsMobileNavHidden(true);
-                 else setActiveTab(id as any);
+                 else if (id === 'admin-unlock') {
+                   withPassword(() => {
+                     addNotification("অ্যাডমিন প্যানেল সফলভাবে আনলক হয়েছে! (PIN 11226)");
+                     setActiveTab('dashboard');
+                   });
+                 } else setActiveTab(id as any);
                }}
              />
            </div>
@@ -11361,6 +11720,15 @@ const MePage = ({
             onClose={() => setAddedToCartProduct(null)}
             onOpenCart={() => setShowCart(true)}
             formatCurrency={formatCurrency}
+          />
+        )}
+        {showTelegramModal && (
+          <TelegramModal
+            isOpen={showTelegramModal}
+            onClose={() => setShowTelegramModal(false)}
+            config={telegramConfig}
+            onSave={handleSaveTelegramConfig}
+            addNotification={addNotification}
           />
         )}
       </AnimatePresence>

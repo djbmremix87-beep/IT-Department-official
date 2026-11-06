@@ -354,15 +354,19 @@
   }
 
   .glass-card {
-    @apply bg-white/70 dark:bg-[#0f172a]/80 border border-white/40 dark:border-green-500/10 shadow-2xl rounded-3xl backdrop-blur-2xl transition-all duration-300;
+    @apply bg-white/75 dark:bg-[#0f172a]/85 border border-white/40 dark:border-green-500/10 shadow-xl rounded-3xl backdrop-blur-md transition-all duration-200;
+    transform: translate3d(0, 0, 0);
   }
   
   .glass-button {
-    @apply bg-white/20 dark:bg-green-500/5 border border-white/30 dark:border-green-500/10 backdrop-blur-md rounded-2xl transition-all duration-300 hover:bg-white/30 dark:hover:bg-green-500/20 shadow-lg;
+    @apply bg-white/20 dark:bg-green-500/5 border border-white/30 dark:border-green-500/10 backdrop-blur-sm rounded-2xl transition-all duration-200 hover:bg-white/30 dark:hover:bg-green-500/20 shadow-md;
   }
 
   .app-bg {
-    @apply fixed inset-0 -z-50 transition-all duration-1000 ease-in-out overflow-hidden;
+    @apply fixed inset-0 -z-50 overflow-hidden pointer-events-none;
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    backface-visibility: hidden;
   }
 
   /* Theme 1: White, Orange, Green (Light Mode) */
@@ -386,21 +390,27 @@
   /* Animated Overlay Shapes for Theme 1 */
   .app-bg-light::after {
     content: '';
-    @apply absolute top-[10%] left-[10%] w-[30rem] h-[30rem] bg-orange-500/10 blur-[120px] rounded-full;
-    animation: blob 7s infinite;
+    @apply absolute top-[10%] left-[10%] w-[30rem] h-[30rem] bg-orange-500/10 blur-[100px] rounded-full pointer-events-none;
+    animation: blob 9s infinite;
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
   }
   
   .app-bg-light::before {
     content: '';
-    @apply absolute bottom-[10%] right-[10%] w-[25rem] h-[25rem] bg-green-500/10 blur-[100px] rounded-full;
-    animation: blob 7s infinite;
-    animation-delay: 2s;
+    @apply absolute bottom-[10%] right-[10%] w-[25rem] h-[25rem] bg-green-500/10 blur-[90px] rounded-full pointer-events-none;
+    animation: blob 9s infinite;
+    animation-delay: 2.5s;
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
   }
 
   /* Glowing Elements for Theme 2 (Blue Mix) */
   .app-bg-dark::after {
     content: '';
-    @apply absolute top-[30%] right-[10%] w-[40rem] h-[40rem] bg-blue-500/15 blur-[150px] rounded-full animate-pulse;
+    @apply absolute top-[30%] right-[10%] w-[40rem] h-[40rem] bg-blue-500/15 blur-[120px] rounded-full animate-pulse pointer-events-none;
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
   }
 
   /* From Uiverse.io by ElSombrero2 - Updated for React and App Theme */
@@ -1972,8 +1982,8 @@
   }
 
   @keyframes rotBGimg {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from { transform: rotate(0deg) translateZ(0); }
+    to { transform: rotate(360deg) translateZ(0); }
   }
 
   /* From Uiverse.io by kyle1dev - Modern Success Message */
@@ -2111,6 +2121,112 @@
     inset: 4px;
     border-radius: inherit;
     z-index: -1;
+  }
+
+  /* Neon Light Card Effect - Highly Optimized for 60/120fps Silky Smooth Scrolling */
+  .neon-hover-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+    z-index: 0;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    contain: layout paint;
+    content-visibility: auto;
+    contain-intrinsic-size: 380px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 14px -3px rgba(0, 240, 255, 0.2), 0 0 10px rgba(255, 0, 127, 0.12);
+  }
+
+  .neon-hover-card::before {
+    content: '';
+    position: absolute;
+    top: -100%;
+    left: -100%;
+    width: 300%;
+    height: 300%;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      transparent 70deg,
+      #00f0ff 120deg,
+      #ff007f 170deg,
+      #9d00ff 220deg,
+      #ff8c00 270deg,
+      #39ff14 320deg,
+      transparent 360deg
+    );
+    animation: rotBGimg 6s linear infinite, neonLightBreathe 3.5s ease-in-out infinite;
+    z-index: 1;
+    pointer-events: none;
+    will-change: transform, opacity;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .neon-hover-card:hover::before {
+    opacity: 1 !important;
+    animation: rotBGimg 2.2s linear infinite;
+  }
+
+  .neon-hover-card:hover {
+    transform: translate3d(0, -4px, 0);
+    box-shadow: 
+      0 14px 30px -4px rgba(0, 240, 255, 0.45), 
+      0 0 20px rgba(255, 0, 127, 0.35);
+  }
+
+  .neon-hover-card::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    background-color: inherit;
+    background: inherit;
+    border-radius: 18px;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  :root.dark .neon-hover-card::after,
+  .dark .neon-hover-card::after {
+    background-color: #0f172a !important;
+  }
+
+  :root:not(.dark) .neon-hover-card::after,
+  html:not(.dark) .neon-hover-card::after {
+    background-color: #ffffff !important;
+  }
+
+  @keyframes neonLightBreathe {
+    0%, 100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.85;
+    }
+  }
+
+  /* GPU-Accelerated Smooth Scrollbar */
+  .custom-scrollbar {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.45);
   }
   
   .codingstella-login_box {
