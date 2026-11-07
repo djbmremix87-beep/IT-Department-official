@@ -11611,8 +11611,8 @@ const MePage = ({
   const syncMissingCategories = () => {
     setProductCategories(prev => {
       const existingNames = new Set(prev.map(c => c.name.toLowerCase()));
-      const missingNames = Array.from(new Set(products.map(p => p.category)))
-        .filter(name => name && !existingNames.has(name.toLowerCase()));
+      const missingNames: string[] = Array.from(new Set(products.map(p => p.category as string)))
+        .filter((name): name is string => typeof name === 'string' && name !== "" && !existingNames.has(name.toLowerCase()));
       
       if (missingNames.length === 0) return prev;
       
