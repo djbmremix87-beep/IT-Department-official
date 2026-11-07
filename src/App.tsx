@@ -6412,6 +6412,8 @@ function AppContent() {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
+  const isStaff = !!staffUser || isAdmin;
+
   const logAuditEvent = useCallback(async (
     action: string,
     category: 'AUTH' | 'FINANCE' | 'INVENTORY' | 'STAFF' | 'SETTINGS' | 'SYSTEM',
@@ -6542,20 +6544,26 @@ function AppContent() {
       setProducts(updatedProducts);
     });
 
-    const unsubscribeOrders = onSnapshot(collection(db, 'public_orders'), (snapshot) => {
-      const updatedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PublicOrder));
-      setPublicOrders(updatedOrders);
-    });
+    let unsubscribeOrders = () => {};
+    if (isAdmin || isStaff) {
+      unsubscribeOrders = onSnapshot(collection(db, 'public_orders'), (snapshot) => {
+        const updatedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PublicOrder));
+        setPublicOrders(updatedOrders);
+      });
+    }
 
     const unsubscribePortfolio = onSnapshot(collection(db, 'portfolio'), (snapshot) => {
       const updated = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PortfolioItem));
       setPortfolioItems(updated);
     });
 
-    const unsubscribeTickets = onSnapshot(collection(db, 'tickets'), (snapshot) => {
-      const updated = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupportTicket));
-      setTickets(updated);
-    });
+    let unsubscribeTickets = () => {};
+    if (isAdmin || isStaff) {
+      unsubscribeTickets = onSnapshot(collection(db, 'tickets'), (snapshot) => {
+        const updated = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupportTicket));
+        setTickets(updated);
+      });
+    }
 
     const unsubscribeNotifications = onSnapshot(
       query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50)),
@@ -6590,27 +6598,33 @@ function AppContent() {
     }
 
     // 3. New Event Notification Listeners
-    const newOrdersQuery = query(collection(db, 'public_orders'), orderBy('createdAt', 'desc'), limit(1));
-    const unsubscribeNewOrders = onSnapshot(newOrdersQuery, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const newOrder = change.doc.data() as PublicOrder;
-          addNotification(`New Order: BDT ${newOrder.total} from ${newOrder.customerName}`, 'admin-order', newOrder);
-        }
-      });
-    });
-
-    const productsQuery = collection(db, 'products');
-    const unsubscribeLowStock = onSnapshot(productsQuery, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'modified') {
-          const product = change.doc.data() as Product;
-          if (product.stock < 5 && product.stock > 0) {
-            addNotification(`Low Stock Alert: ${product.name} is running low (${product.stock} left)`);
+    let unsubscribeNewOrders = () => {};
+    if (isAdmin || isStaff) {
+      const newOrdersQuery = query(collection(db, 'public_orders'), orderBy('createdAt', 'desc'), limit(1));
+      unsubscribeNewOrders = onSnapshot(newOrdersQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const newOrder = change.doc.data() as PublicOrder;
+            addNotification(`New Order: BDT ${newOrder.total} from ${newOrder.customerName}`, 'admin-order', newOrder);
           }
-        }
+        });
       });
-    });
+    }
+
+    let unsubscribeLowStock = () => {};
+    if (isAdmin || isStaff) {
+      const productsQuery = collection(db, 'products');
+      unsubscribeLowStock = onSnapshot(productsQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'modified') {
+            const product = change.doc.data() as Product;
+            if (product.stock < 5 && product.stock > 0) {
+              addNotification(`Low Stock Alert: ${product.name} is running low (${product.stock} left)`);
+            }
+          }
+        });
+      });
+    }
 
     return () => {
       unsubscribeProducts();
