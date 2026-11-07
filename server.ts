@@ -5,6 +5,11 @@ import fs from "fs";
 import os from "os";
 import { execSync } from "child_process";
 import { GoogleGenAI } from "@google/genai";
+import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+
+initializeApp();
+const authAdmin = getAuth();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -64,26 +69,20 @@ const rateLimitMiddleware = (maxRequests = 60, windowMs = 60000) => {
 app.use("/api/", rateLimitMiddleware(100, 60000));
 
 // Admin authentication middleware
-const requireAdminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const adminEmailHeader = req.headers['x-admin-email'] as string;
+const requireAdminAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;
   
-  // Accept if valid admin email header is present or Bearer token is provided
-  if (adminEmailHeader && ADMIN_EMAILS.includes(adminEmailHeader.toLowerCase())) {
-    return next();
-  }
-
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.split("Bearer ")[1];
-    if (token && token.length > 10) {
-      return next();
+    try {
+      const decodedToken = await authAdmin.verifyIdToken(token);
+      // Verify email is in ADMIN_EMAILS
+      if (decodedToken.email && ADMIN_EMAILS.includes(decodedToken.email.toLowerCase())) {
+        return next();
+      }
+    } catch (error) {
+      console.error("Auth verification failed:", error);
     }
-  }
-
-  // In local preview/dev environment, allow same-origin requests
-  const host = req.get('host') || '';
-  if (host.includes('localhost') || host.includes('0.0.0.0') || host.includes('run.app')) {
-    return next();
   }
 
   return res.status(401).json({ error: "Unauthorized access. Administrator privilege required." });

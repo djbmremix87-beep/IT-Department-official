@@ -18,14 +18,11 @@ export const TelegramModal: React.FC<TelegramModalProps> = ({
   onSave,
   addNotification
 }) => {
-  const [botToken, setBotToken] = useState(config.botToken || '');
-  const [chatId, setChatId] = useState(config.chatId || '');
   const [enabled, setEnabled] = useState(config.enabled ?? true);
   const [notifyOrders, setNotifyOrders] = useState(config.notifyOrders ?? true);
   const [notifyAlerts, setNotifyAlerts] = useState(config.notifyAlerts ?? true);
   const [notifyStaffLocation, setNotifyStaffLocation] = useState(config.notifyStaffLocation ?? true);
 
-  const [showToken, setShowToken] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -33,15 +30,6 @@ export const TelegramModal: React.FC<TelegramModalProps> = ({
   if (!isOpen) return null;
 
   const handleTest = async () => {
-    if (!botToken.trim()) {
-      setTestResult({ success: false, message: 'Please enter Bot Token' });
-      return;
-    }
-    if (!chatId.trim()) {
-      setTestResult({ success: false, message: 'Please enter Chat ID' });
-      return;
-    }
-
     setTesting(true);
     setTestResult(null);
 
@@ -52,14 +40,7 @@ export const TelegramModal: React.FC<TelegramModalProps> = ({
 📍 স্টাফদের লাইভ লোকেশন ও গুগল ম্যাপস লিংক এখানে আসবে।
 🕒 সময়: ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}`;
 
-    const res = await sendTelegramMessage(testMsg, 'HTML', {
-      botToken: botToken.trim(),
-      chatId: chatId.trim(),
-      enabled: true,
-      notifyOrders,
-      notifyAlerts,
-      notifyStaffLocation
-    });
+    const res = await sendTelegramMessage(testMsg, 'HTML');
 
     setTesting(false);
     if (res.success) {
@@ -68,7 +49,7 @@ export const TelegramModal: React.FC<TelegramModalProps> = ({
     } else {
       setTestResult({
         success: false,
-        message: `ব্যর্থ হয়েছে: ${res.error || 'টোকেন বা চ্যাট আইডি যাচাই করুন। বটে /start চাপতে ভুলবেন না।'}`
+        message: `ব্যর্থ হয়েছে: ${res.error || 'বট কানেকশন যাচাই করুন।'}`
       });
     }
   };
@@ -76,8 +57,6 @@ export const TelegramModal: React.FC<TelegramModalProps> = ({
   const handleSave = async () => {
     setSaving(true);
     const newConfig: TelegramConfig = {
-      botToken: botToken.trim(),
-      chatId: chatId.trim(),
       enabled,
       notifyOrders,
       notifyAlerts,
@@ -145,64 +124,12 @@ export const TelegramModal: React.FC<TelegramModalProps> = ({
             </label>
           </div>
 
-          {/* Bot Token Input */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Telegram Bot Token <span className="text-red-500">*</span>
-              </label>
-              <a
-                href="https://t.me/BotFather"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold"
-              >
-                <span>Get from @BotFather</span>
-                <ExternalLink size={10} />
-              </a>
-            </div>
-            <div className="relative">
-              <input
-                type={showToken ? 'text' : 'password'}
-                value={botToken}
-                onChange={(e) => setBotToken(e.target.value)}
-                placeholder="e.g. 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
-                className="w-full px-4 py-3 pr-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
-              <button
-                type="button"
-                onClick={() => setShowToken(!showToken)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-              >
-                {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
+          {/* Bot Token Input (Removed for security) */}
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-2xl border border-amber-200 dark:border-amber-900/50 text-[11px] text-amber-800 dark:text-amber-300">
+            <p className="font-bold">Security Notice:</p>
+            <p>Telegram Bot Token and Chat ID are now managed securely via server environment variables. Please contact an administrator to update these credentials.</p>
           </div>
 
-          {/* Chat ID Input */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Chat ID / Channel ID <span className="text-red-500">*</span>
-              </label>
-              <a
-                href="https://t.me/userinfobot"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold"
-              >
-                <span>Find ID via @userinfobot</span>
-                <ExternalLink size={10} />
-              </a>
-            </div>
-            <input
-              type="text"
-              value={chatId}
-              onChange={(e) => setChatId(e.target.value)}
-              placeholder="e.g. 987654321 or -100123456789"
-              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
 
           {/* Individual Feature Notification Toggles */}
           <div className="space-y-2 pt-2">

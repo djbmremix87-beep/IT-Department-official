@@ -4107,7 +4107,7 @@ const ManageStaff = ({
                 {member.lastKnownLocation && (
                   <button
                     onClick={async () => {
-                      if (!telegramConfig?.botToken || !telegramConfig?.chatId) {
+                      if (!telegramConfig?.enabled) {
                         onOpenTelegram?.();
                         addNotification("প্রথমে টেলিগ্রাম বট কনফিগার করুন!");
                         return;

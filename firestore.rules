@@ -33,10 +33,6 @@ service cloud.firestore {
       );
     }
 
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128;
-    }
-
     function incoming() {
       return request.resource.data;
     }
@@ -94,11 +90,12 @@ service cloud.firestore {
       allow write, create, update, delete: if isAdmin();
     }
 
-    // Public Orders: Public can submit order with validation; Admins & Staff manage orders
+    // Public Orders: Public can submit order; Admins & Staff manage orders
     match /public_orders/{orderId} {
       allow create: if isValidPublicOrder(incoming());
       allow read, list: if isAdmin() || isStaff() || (isSignedIn() && existing().customerUid == request.auth.uid);
-      allow update, delete: if isAdmin() || isStaff();
+      allow update: if isAdmin() || isStaff();
+      allow delete: if isAdmin();
     }
 
     // Clients collection: Admin and Staff full access, Client can read own profile
@@ -133,17 +130,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Notifications collection: Restricted to authenticated users/admins
+    // Notifications collection: Restricted to owner or admin
     match /notifications/{notificationId} {
-      allow read: if isSignedIn();
+      allow read: if isAdmin() || (isSignedIn() && existing().uid == request.auth.uid);
       allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow update, delete: if isAdmin() || (isSignedIn() && existing().uid == request.auth.uid);
     }
 
     // Audit Logs collection: Read by Admin; Create by authenticated users; Immutable
     match /audit_logs/{logId} {
       allow read: if isAdmin();
-      allow create: if isSignedIn() || isAdmin();
+      allow create: if isSignedIn();
       allow update, delete: if false;
     }
 
@@ -153,7 +150,7 @@ service cloud.firestore {
       allow write, update: if isAdmin();
     }
 
-    // Users collection: Strict ownership and admin management; Prevent privilege escalation
+    // Users collection: Strict ownership and admin management
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin() || isStaff();
       allow create: if isOwner(userId) && (!("role" in incoming()) || incoming().role == "user" || isAdmin());
@@ -163,7 +160,7 @@ service cloud.firestore {
 
     // Admins metadata collection
     match /admins/{adminUid} {
-      allow read: if isSignedIn();
+      allow read: if isAdmin();
       allow write, create, update, delete: if isAdmin();
     }
   }

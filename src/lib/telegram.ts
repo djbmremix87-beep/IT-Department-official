@@ -5,54 +5,21 @@ export interface TelegramConfig {
   notifyOrders: boolean;
   notifyAlerts: boolean;
   notifyStaffLocation: boolean;
-  botToken?: string;
-  chatId?: string;
 }
 
 const STORAGE_KEY = 'cctv_telegram_config';
 
 export const getDefaultTelegramConfig = (): TelegramConfig => {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        enabled: parsed.enabled ?? true,
-        notifyOrders: parsed.notifyOrders ?? true,
-        notifyAlerts: parsed.notifyAlerts ?? true,
-        notifyStaffLocation: parsed.notifyStaffLocation ?? true,
-        botToken: parsed.botToken || '',
-        chatId: parsed.chatId || ''
-      };
-    }
-  } catch (e) {
-    console.warn('Failed to parse telegram config from localStorage', e);
-  }
-
   return {
     enabled: true,
     notifyOrders: true,
     notifyAlerts: true,
-    notifyStaffLocation: true,
-    botToken: '',
-    chatId: ''
+    notifyStaffLocation: true
   };
 };
 
 export const saveTelegramConfig = (config: TelegramConfig): void => {
-  try {
-    const safeConfig = {
-      enabled: config.enabled,
-      notifyOrders: config.notifyOrders,
-      notifyAlerts: config.notifyAlerts,
-      notifyStaffLocation: config.notifyStaffLocation,
-      botToken: config.botToken || '',
-      chatId: config.chatId || ''
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(safeConfig));
-  } catch (e) {
-    console.warn('Failed to save telegram config to localStorage', e);
-  }
+  // Secrets are handled server-side only
 };
 
 /**
